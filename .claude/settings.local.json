@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(php --version)",
+      "Bash(composer --version)",
+      "Bash(brew --version)",
+      "Bash(brew list *)",
+      "Bash(/opt/homebrew/opt/php/bin/php --version)",
+      "Bash(brew outdated *)",
+      "Bash(export HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ENV_HINTS=1)",
+      "Bash(brew install *)",
+      "Bash(brew unlink *)",
+      "Bash(brew link *)",
+      "Bash(grep -rn \"php@7.4\\\\|php@8.0\\\\|opt/php\" ~/.zshrc ~/.zprofile ~/.zshenv ~/.bash_profile ~/.profile 2>/dev/null)",
+      "Bash(cd /Users/muzaffarmakhkamov/PhpstormProjects/EduGateCabinet *)",
+      "Bash(unzip -l \"EduGate  1.zip\")",
+      "Bash(node scripts/validate_palette.js \"#0878FF,#eb6834,#1baf7a\" --mode light --surface \"#FFFFFF\" --pairs all)",
+      "Bash(node scripts/validate_palette.js \"#0878FF,#eb6834,#1baf7a\" --mode dark --surface \"#131316\" --pairs all)",
+      "Bash(node scripts/validate_palette.js \"#0878FF,#d95926,#199e70\" --mode dark --surface \"#131316\" --pairs all)"
+    ]
+  }
+}

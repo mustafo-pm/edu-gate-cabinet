@@ -1,0 +1,187 @@
+/* ═══════════════════════════════════════════════════════════════
+   EduGate — Design Tokens (shadcn/ui aesthetic)
+   Neutral zinc palette + EduGate brand blue as `primary`.
+   Light + dark. Same --eg-* names so existing views inherit the refresh.
+═══════════════════════════════════════════════════════════════ */
+
+:root {
+  /* ── Brand (fixed) ────────────────────────────────── */
+  --eg-blue:        #0878FF;   /* primary */
+  --eg-blue-hover:  #0a6ce6;
+  --eg-navy:        #002549;
+  --eg-white:       #FEFEFD;
+
+  /* ── Brand gradients ──────────────────────────────── */
+  --eg-grad-dark:   linear-gradient(135deg, #271F4A 0%, #6357A1 100%);
+  --eg-grad-ocean:  linear-gradient(135deg, #4DC2F1 0%, #83CDE0 100%);
+  --eg-grad-cta:    linear-gradient(135deg, #271F4A 0%, #6357A1 50%, #0878FF 100%);
+  --eg-grad-light:  #EEEEFF;
+
+  /* ── Neutrals — shadcn zinc (light) ───────────────── */
+  --eg-ink:         #09090B;   /* foreground */
+  --eg-text-2:      #3F3F46;   /* body */
+  --eg-muted:       #71717A;   /* muted-foreground */
+  --eg-on-dark:     #FFFFFF;
+  --eg-on-dark-2:   rgba(255,255,255,.7);
+
+  --eg-surface:     #FAFAFA;   /* page background */
+  --eg-surface-2:   #F4F4F5;   /* muted / accent / hover */
+  --eg-card:        #FFFFFF;   /* card / popover */
+  --eg-border:      #E4E4E7;   /* border / input */
+  --eg-ring:        #0878FF;   /* focus ring = primary */
+
+  /* ── Status ───────────────────────────────────────── */
+  --eg-success:     #059669;   --eg-success-bg: #ECFDF5;
+  --eg-processing:  #0878FF;   --eg-processing-bg: #EFF6FF;
+  --eg-warning:     #D97706;   --eg-warning-bg: #FFFBEB;
+  --eg-danger:      #DC2626;   --eg-danger-bg: #FEF2F2;
+  --eg-refund:      #7C3AED;   --eg-refund-bg: #F5F3FF;
+
+  /* ── Typography ───────────────────────────────────── */
+  --eg-font: -apple-system, "SF Pro Display", "SF Pro Text",
+             BlinkMacSystemFont, "Segoe UI", "Inter", system-ui, sans-serif;
+  --eg-font-mono: "SF Mono", ui-monospace, Menlo, Consolas, monospace;
+
+  /* ── Radius (shadcn) ──────────────────────────────── */
+  --radius:    0.625rem;       /* 10px base */
+  --eg-r-sm:   calc(var(--radius) - 4px);
+  --eg-r-md:   calc(var(--radius) - 2px);
+  --eg-r-card: var(--radius);
+  --eg-r-lg:   calc(var(--radius) + 4px);
+  --eg-r-pill: 100px;
+
+  /* ── Shadows (subtle, shadcn) ─────────────────────── */
+  --eg-shadow-sm:  0 1px 2px 0 rgb(0 0 0 / .05);
+  --eg-shadow-md:  0 1px 3px 0 rgb(0 0 0 / .08), 0 1px 2px -1px rgb(0 0 0 / .08);
+  --eg-shadow-lg:  0 10px 30px -10px rgb(0 0 0 / .18);
+  --eg-shadow-btn: 0 1px 2px 0 rgb(8 120 255 / .25);
+
+  /* ── Motion ───────────────────────────────────────── */
+  --eg-ease:   cubic-bezier(.4,0,.2,1);
+  --eg-dur:    .15s;
+
+  /* ── Data-viz (validated categorical palette + chrome, light) ── */
+  --viz-1:    #0878FF;   /* brand blue */
+  --viz-2:    #EB6834;   /* orange */
+  --viz-3:    #1BAF7A;   /* aqua */
+  --viz-grid: #E4E4E7;
+  --viz-axis: #C3C2B7;
+  --viz-track:#F1F5F9;
+}
+
+/* ── Dark theme ──────────────────────────────────────── */
+.dark {
+  --eg-ink:       #FAFAFA;
+  --eg-text-2:    #D4D4D8;
+  --eg-muted:     #A1A1AA;
+  --eg-on-dark:   #FFFFFF;
+
+  --eg-surface:   #09090B;   /* page */
+  --eg-surface-2: #1C1C1F;   /* muted / accent */
+  --eg-card:      #131316;   /* card */
+  --eg-border:    #27272A;   /* border */
+
+  --eg-shadow-sm: 0 1px 2px 0 rgb(0 0 0 / .4);
+  --eg-shadow-md: 0 2px 6px 0 rgb(0 0 0 / .5);
+  --eg-shadow-lg: 0 12px 40px -10px rgb(0 0 0 / .6);
+
+  /* Data-viz — dark-stepped categorical (validated) + chrome */
+  --viz-1:    #0878FF;
+  --viz-2:    #D95926;
+  --viz-3:    #199E70;
+  --viz-grid: #27272A;
+  --viz-axis: #383835;
+  --viz-track:#1C1C1F;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   Primitives — shadcn/ui component styling
+═══════════════════════════════════════════════════════════════ */
+
+.eg-btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: .5rem;
+  white-space: nowrap;
+  font-family: var(--eg-font);
+  font-size: .875rem;
+  font-weight: 500;
+  height: 2.25rem;                 /* h-9 */
+  padding: 0 1rem;
+  border-radius: var(--eg-r-md);
+  border: 1px solid transparent;
+  cursor: pointer;
+  text-decoration: none;
+  line-height: 1;
+  transition: background-color var(--eg-dur) var(--eg-ease),
+              color var(--eg-dur) var(--eg-ease),
+              border-color var(--eg-dur) var(--eg-ease),
+              box-shadow var(--eg-dur) var(--eg-ease);
+}
+.eg-btn:focus-visible { outline: none; box-shadow: 0 0 0 2px var(--eg-surface), 0 0 0 4px var(--eg-ring); }
+.eg-btn--primary { background: var(--eg-blue); color: #fff; box-shadow: var(--eg-shadow-btn); }
+.eg-btn--primary:hover { background: var(--eg-blue-hover); }
+.eg-btn--outline { background: var(--eg-card); color: var(--eg-ink); border-color: var(--eg-border); box-shadow: var(--eg-shadow-sm); }
+.eg-btn--outline:hover { background: var(--eg-surface-2); }
+.eg-btn--ghost { background: transparent; color: var(--eg-on-dark); border-color: rgba(255,255,255,.2); }
+.eg-btn--ghost:hover { background: rgba(255,255,255,.12); }
+.eg-btn--danger { background: var(--eg-danger); color: #fff; }
+.eg-btn--danger:hover { background: #c01f1f; }
+
+.eg-card {
+  background: var(--eg-card);
+  border: 1px solid var(--eg-border);
+  border-radius: var(--eg-r-card);
+  box-shadow: var(--eg-shadow-sm);
+  padding: 1.5rem;
+}
+
+.eg-badge {
+  --c: var(--eg-muted);
+  display: inline-flex; align-items: center; gap: 4px;
+  font-size: .75rem; font-weight: 500;
+  padding: 2px 8px; border-radius: var(--eg-r-sm);
+  white-space: nowrap;
+  color: var(--c);
+  background: color-mix(in srgb, var(--c) 12%, transparent);
+  border: 1px solid color-mix(in srgb, var(--c) 25%, transparent);
+}
+
+.eg-input {
+  width: 100%;
+  font-family: var(--eg-font);
+  font-size: .875rem;
+  height: 2.25rem;                 /* h-9 */
+  padding: 0 .75rem;
+  border: 1px solid var(--eg-border);
+  border-radius: var(--eg-r-md);
+  background: var(--eg-card);
+  color: var(--eg-ink);
+  box-shadow: var(--eg-shadow-sm);
+  transition: border-color var(--eg-dur) var(--eg-ease), box-shadow var(--eg-dur) var(--eg-ease);
+}
+.eg-input::placeholder { color: var(--eg-muted); }
+.eg-input:focus {
+  outline: none;
+  border-color: var(--eg-ring);
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--eg-ring) 25%, transparent);
+}
+/* multi-line / file inputs shouldn't be forced to h-9 */
+textarea.eg-input, .eg-input[type="file"] { height: auto; padding: .5rem .75rem; }
+
+.eg-mono { font-family: var(--eg-font-mono); font-size: 0.8125rem; }
+
+[x-cloak] { display: none !important; }
+
+/* Charts render static — no entrance animations. */
+.eg-line { stroke-dasharray: none; stroke-dashoffset: 0; }
+.eg-area, .eg-dot, .eg-rise { opacity: 1; }
+.eg-bar  { transform: none; }
+
+/* Native <details> dropdown: hide the default disclosure marker. */
+.eg-dd > summary { list-style: none; }
+.eg-dd > summary::-webkit-details-marker { display: none; }
+.eg-dd > summary::marker { content: ''; }
+
+/* Theme option rows: show the check only on the active mode. */
+.eg-theme-opt .eg-check { visibility: hidden; }
+.eg-theme-opt[aria-current="true"] { color: var(--eg-ink); font-weight: 600; }
+.eg-theme-opt[aria-current="true"] .eg-check { visibility: visible; }

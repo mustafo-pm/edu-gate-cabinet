@@ -1,0 +1,55 @@
+@import 'tailwindcss';
+@import './edugate-tokens.css';
+
+@source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
+@source '../../storage/framework/views/*.php';
+@source '../views';
+
+/* Class-based dark mode: toggling `.dark` on <html> flips themed utilities. */
+@custom-variant dark (&:where(.dark, .dark *));
+
+/* ── EduGate brand palette wired into Tailwind utilities ──
+   Fixed brand/accent colours are static; surface/text/border reference CSS
+   variables (defined in edugate-tokens.css) so they flip in dark mode. */
+@theme {
+  --font-sans: -apple-system, 'SF Pro Display', 'SF Pro Text', 'Inter', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'SF Mono', ui-monospace, Menlo, Consolas, monospace;
+
+  /* Fixed brand + status accents */
+  --color-eg-blue:    #0878FF;
+  --color-eg-navy:    #002549;
+  --color-eg-white:   #FEFEFD;
+  --color-eg-success:    #059669;
+  --color-eg-success-bg: #ECFDF5;
+  --color-eg-warning:    #D97706;
+  --color-eg-warning-bg: #FFFBEB;
+  --color-eg-danger:     #DC2626;
+  --color-eg-danger-bg:  #FEF2F2;
+  --color-eg-violet:     #7C3AED;
+  --color-eg-violet-bg:  #F5F3FF;
+
+  /* Theme-aware semantics (flip via CSS vars under .dark) */
+  --color-eg-surface:  var(--eg-surface);
+  --color-eg-surface2: var(--eg-surface-2);
+  --color-eg-card:     var(--eg-card);
+  --color-eg-ink:      var(--eg-ink);
+  --color-eg-text:     var(--eg-text-2);
+  --color-eg-muted:    var(--eg-muted);
+  --color-eg-border:   var(--eg-border);
+  --color-eg-ring:     var(--eg-ring);
+
+  --radius-sm:   calc(var(--radius) - 4px);
+  --radius-md:   calc(var(--radius) - 2px);
+  --radius-card: var(--radius);
+  --radius-pill: 100px;
+
+  --shadow-eg-sm: var(--eg-shadow-sm);
+  --shadow-eg-md: var(--eg-shadow-md);
+  --shadow-eg-lg: var(--eg-shadow-lg);
+}
+
+/* shadcn-style base: default border colour + focus-ring reset */
+@layer base {
+  * { border-color: var(--eg-border); }
+  body { background: var(--eg-surface); color: var(--eg-ink); }
+}
