@@ -14,7 +14,9 @@
 /.zed
 /auth.json
 /node_modules
-/public/build
+# public/build IS committed: the shared host cannot run `npm run build`
+# (resource limits), so compiled assets ship with the repo. Rebuild + commit
+# after any front-end change: npm run build && git add public/build
 /public/fonts-manifest.dev.json
 /public/hot
 /public/storage
