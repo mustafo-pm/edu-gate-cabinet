@@ -51,6 +51,23 @@ php artisan test
 
 ## Deployment notes (VPS / CI-CD)
 
+> **cPanel: use the PHP 8.4 binary explicitly.** The account's default CLI `php`
+> may be 8.3, which this app refuses to run on (Laravel 13 needs ≥ 8.4.1). Any
+> cron job, deploy script or manual command must call the full path:
+>
+> ```bash
+> /opt/cpanel/ea-php84/root/usr/bin/php artisan <command>
+> ```
+>
+> A bare `php artisan ...` will fail with
+> *"Your Composer dependencies require a PHP version >= 8.4.1"*.
+
+> **`APP_URL` must match the real host** (`https://cabinet.edu-gate.uz`).
+> Laravel builds uploaded-file URLs from it, so a wrong value silently breaks
+> every image — bank logos included — while the pages still load fine.
+> Run `php artisan storage:link` once so `public/storage` exists.
+
+
 Production requires the build + optimize steps below. A typical deploy script:
 
 ```bash

@@ -78,6 +78,18 @@ class ImportBankLogos extends Command
             $imported++;
         }
 
+        // Drop any logo_path whose file is not actually on disk. The bank CSV
+        // names a logo for every bank (Budget -> default.png) but we do not
+        // ship them all, and a dangling path renders as a broken image instead
+        // of the column's own empty state.
+        $pruned = 0;
+        foreach (Bank::whereNotNull('logo_path')->get() as $bank) {
+            if (! Storage::disk('public')->exists($bank->logo_path)) {
+                $bank->update(['logo_path' => null]);
+                $pruned++;
+            }
+        }
+
         // Compare against the SOURCE files actually consumed, not the renamed
         // targets — the two never match after slug renaming.
         $unused = $files
@@ -87,6 +99,9 @@ class ImportBankLogos extends Command
 
         $this->newLine();
         $this->info("Logos imported: {$imported} of ".Bank::count().' banks');
+        if ($pruned > 0) {
+            $this->info("Cleared {$pruned} logo path(s) pointing at a missing file");
+        }
         if ($missing) {
             $this->warn('No logo found for: '.implode(', ', $missing));
         }
