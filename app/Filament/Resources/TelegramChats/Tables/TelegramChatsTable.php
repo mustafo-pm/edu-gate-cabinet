@@ -19,6 +19,13 @@ class TelegramChatsTable
             ->defaultSort('id')
             ->columns([
                 TextColumn::make('title')->label('Chat')->searchable()->placeholder('—'),
+                TextColumn::make('topic_name')
+                    ->label('Topic')
+                    ->formatStateUsing(fn ($state, TelegramChat $r) => filled($r->message_thread_id)
+                        ? ($state ?: 'Topic #'.$r->message_thread_id)
+                        : 'General')
+                    ->badge()
+                    ->color(fn (TelegramChat $r) => filled($r->message_thread_id) ? 'info' : 'gray'),
                 TextColumn::make('chat_id')->label('Chat ID')->fontFamily('mono')->searchable(),
                 TextColumn::make('type')->badge()->placeholder('—'),
                 IconColumn::make('is_active')->label('Active')->boolean(),
@@ -29,7 +36,7 @@ class TelegramChatsTable
                 // Telegram only reveals a chat once the bot has seen an update
                 // from it, so this is a pull, not a push.
                 Action::make('discover')
-                    ->label('Discover chats')
+                    ->label('Discover chats & topics')
                     ->icon('heroicon-o-magnifying-glass')
                     ->action(function (): void {
                         $found = Telegram::discoverChats();
@@ -37,7 +44,7 @@ class TelegramChatsTable
                         if (! $found) {
                             Notification::make()
                                 ->title('No chats found')
-                                ->body('Post "/start@edu_gate_bot" in the group, then try again.')
+                                ->body('Post "/start@edu_gate_bot" inside the topic you want alerts in, then try again.')
                                 ->warning()->persistent()->send();
 
                             return;
@@ -45,15 +52,23 @@ class TelegramChatsTable
 
                         $new = 0;
                         foreach ($found as $chat) {
+                            // One row per chat+topic pair.
                             $record = TelegramChat::updateOrCreate(
-                                ['chat_id' => $chat['chat_id']],
-                                ['title' => $chat['title'], 'type' => $chat['type']],
+                                [
+                                    'chat_id' => $chat['chat_id'],
+                                    'message_thread_id' => $chat['message_thread_id'],
+                                ],
+                                array_filter([
+                                    'title' => $chat['title'],
+                                    'type' => $chat['type'],
+                                    'topic_name' => $chat['topic_name'],
+                                ], fn ($v) => $v !== null),
                             );
                             $new += $record->wasRecentlyCreated ? 1 : 0;
                         }
 
                         Notification::make()
-                            ->title(count($found).' chat(s) found'.($new ? ", {$new} new" : ''))
+                            ->title(count($found).' destination(s) found'.($new ? ", {$new} new" : ''))
                             ->success()->send();
                     }),
             ])
@@ -64,8 +79,10 @@ class TelegramChatsTable
                     ->action(function (TelegramChat $record): void {
                         $ok = Telegram::send(
                             $record->chat_id,
-                            "✅ <b>EduGate test alert</b>\n\nIf you can read this, alerts are working.",
+                            "✅ <b>EduGate test alert</b>\n\nIf you can read this, alerts will arrive here: <b>"
+                                .Telegram::escape($record->label()).'</b>',
                             'test',
+                            $record->message_thread_id,
                         );
 
                         Notification::make()

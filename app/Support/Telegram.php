@@ -35,8 +35,13 @@ final class Telegram
         return htmlspecialchars((string) $text, ENT_NOQUOTES | ENT_SUBSTITUTE, 'UTF-8');
     }
 
-    /** Send to one chat. Returns true on success. */
-    public static function send(string $chatId, string $html, ?string $event = null): bool
+    /**
+     * Send to one destination. Returns true on success.
+     *
+     * `$threadId` is a forum topic: without it the message lands in the
+     * group's "General" topic rather than the one that was chosen.
+     */
+    public static function send(string $chatId, string $html, ?string $event = null, ?string $threadId = null): bool
     {
         if (! self::configured()) {
             self::log($event, $chatId, $html, false, 'TELEGRAM_BOT_TOKEN is not set');
@@ -45,14 +50,20 @@ final class Telegram
         }
 
         try {
+            $payload = [
+                'chat_id' => $chatId,
+                'text' => $html,
+                'parse_mode' => 'HTML',
+                'disable_web_page_preview' => true,
+            ];
+
+            if (filled($threadId)) {
+                $payload['message_thread_id'] = (int) $threadId;
+            }
+
             $response = Http::timeout((int) config('services.telegram.timeout', 8))
                 ->asJson()
-                ->post(self::endpoint('sendMessage'), [
-                    'chat_id' => $chatId,
-                    'text' => $html,
-                    'parse_mode' => 'HTML',
-                    'disable_web_page_preview' => true,
-                ]);
+                ->post(self::endpoint('sendMessage'), $payload);
 
             $ok = $response->successful() && (bool) $response->json('ok');
             $error = $ok ? null : (string) ($response->json('description') ?? 'HTTP '.$response->status());
@@ -69,13 +80,22 @@ final class Telegram
         }
     }
 
-    /** Broadcast to every active chat. Returns how many succeeded. */
-    public static function broadcast(string $html, ?string $event = null): int
+    /**
+     * Deliver to every active destination, or to one specific destination when
+     * an alert rule targets a single topic.
+     *
+     * @return int how many sends succeeded
+     */
+    public static function broadcast(string $html, ?string $event = null, ?TelegramChat $only = null): int
     {
         $sent = 0;
 
-        foreach (TelegramChat::where('is_active', true)->get() as $chat) {
-            $ok = self::send($chat->chat_id, $html, $event);
+        $targets = $only
+            ? collect([$only])
+            : TelegramChat::where('is_active', true)->get();
+
+        foreach ($targets as $chat) {
+            $ok = self::send($chat->chat_id, $html, $event, $chat->message_thread_id);
 
             $chat->forceFill($ok
                 ? ['last_sent_at' => now(), 'last_error' => null]
@@ -88,7 +108,17 @@ final class Telegram
         return $sent;
     }
 
-    /** Chats the bot currently knows about, discovered from getUpdates. */
+    /**
+     * Destinations the bot currently knows about, read from getUpdates.
+     *
+     * Telegram has no "list topics" endpoint — a topic only becomes visible
+     * once the bot sees an update from it. So each distinct
+     * (chat_id, message_thread_id) pair found in recent updates is returned as
+     * its own destination, and the topic's name is recovered from the
+     * `forum_topic_created` service message when Telegram includes it.
+     *
+     * @return array<int, array{chat_id:string, message_thread_id:?string, topic_name:?string, title:?string, type:?string}>
+     */
     public static function discoverChats(): array
     {
         if (! self::configured()) {
@@ -102,16 +132,34 @@ final class Telegram
             ]);
 
             $found = [];
+
             foreach ((array) $response->json('result', []) as $update) {
                 foreach (['message', 'channel_post', 'my_chat_member', 'edited_message'] as $key) {
-                    $chat = data_get($update, $key.'.chat');
-                    if ($chat && isset($chat['id'])) {
-                        $found[(string) $chat['id']] = [
-                            'chat_id' => (string) $chat['id'],
-                            'title' => $chat['title'] ?? trim(($chat['first_name'] ?? '').' '.($chat['last_name'] ?? '')) ?: ($chat['username'] ?? null),
-                            'type' => $chat['type'] ?? null,
-                        ];
+                    $node = data_get($update, $key);
+                    $chat = data_get($node, 'chat');
+
+                    if (! $chat || ! isset($chat['id'])) {
+                        continue;
                     }
+
+                    // Only real forum messages carry a usable thread id.
+                    $threadId = data_get($node, 'is_topic_message') ? data_get($node, 'message_thread_id') : null;
+
+                    $topicName = data_get($node, 'forum_topic_created.name')
+                        ?? data_get($node, 'reply_to_message.forum_topic_created.name')
+                        ?? data_get($node, 'forum_topic_edited.name');
+
+                    $key = $chat['id'].':'.($threadId ?? '');
+
+                    // Keep the richest record: a later update may reveal the name.
+                    $found[$key] = [
+                        'chat_id' => (string) $chat['id'],
+                        'message_thread_id' => $threadId !== null ? (string) $threadId : null,
+                        'topic_name' => $topicName ?: ($found[$key]['topic_name'] ?? null),
+                        'title' => $chat['title']
+                            ?? (trim(($chat['first_name'] ?? '').' '.($chat['last_name'] ?? '')) ?: ($chat['username'] ?? null)),
+                        'type' => $chat['type'] ?? null,
+                    ];
                 }
             }
 

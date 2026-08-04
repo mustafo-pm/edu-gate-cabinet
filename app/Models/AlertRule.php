@@ -6,10 +6,11 @@ namespace App\Models;
 
 use App\Enums\AlertEvent;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class AlertRule extends Model
 {
-    protected $fillable = ['event', 'is_enabled', 'threshold', 'send_at'];
+    protected $fillable = ['event', 'is_enabled', 'telegram_chat_id', 'threshold', 'send_at'];
 
     protected function casts(): array
     {
@@ -20,7 +21,12 @@ class AlertRule extends Model
         ];
     }
 
-    /** The rule for an event, or null when it has never been configured. */
+    /** Optional single destination; null means every active destination. */
+    public function telegramChat(): BelongsTo
+    {
+        return $this->belongsTo(TelegramChat::class);
+    }
+
     public static function for(AlertEvent $event): ?self
     {
         return static::where('event', $event->value)->first();

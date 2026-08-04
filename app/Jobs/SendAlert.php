@@ -38,7 +38,10 @@ class SendAlert implements ShouldQueue
         }
 
         try {
-            Telegram::broadcast(Alerts::format($event, $this->payload), $event->value);
+            // A rule may pin its alert to one topic; otherwise broadcast.
+            $target = \App\Models\AlertRule::for($event)?->telegramChat;
+
+            Telegram::broadcast(Alerts::format($event, $this->payload), $event->value, $target);
         } catch (\Throwable $e) {
             // Swallow: an alert must never take down the request that raised it.
             Log::warning('SendAlert failed', ['event' => $this->event, 'error' => $e->getMessage()]);

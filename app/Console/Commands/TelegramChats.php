@@ -36,7 +36,7 @@ class TelegramChats extends Command
         if (! $found) {
             $this->warn('No chats found.');
             $this->line('Telegram only reveals a chat after the bot receives an update from it.');
-            $this->line('Post this in the group, then run the command again:');
+            $this->line('Post this INSIDE the topic you want alerts in, then re-run:');
             $this->newLine();
             $this->line('    /start@edu_gate_bot');
 
@@ -45,16 +45,28 @@ class TelegramChats extends Command
 
         foreach ($found as $chat) {
             $record = TelegramChat::updateOrCreate(
-                ['chat_id' => $chat['chat_id']],
-                ['title' => $chat['title'], 'type' => $chat['type']],
+                [
+                    'chat_id' => $chat['chat_id'],
+                    'message_thread_id' => $chat['message_thread_id'],
+                ],
+                array_filter([
+                    'title' => $chat['title'],
+                    'type' => $chat['type'],
+                    'topic_name' => $chat['topic_name'],
+                ], fn ($v) => $v !== null),
             );
-            $this->info(sprintf('%s  %s  (%s)%s',
+
+            $this->info(sprintf('%s  chat=%s  topic=%-18s %s',
                 $record->wasRecentlyCreated ? 'added  ' : 'updated',
                 $chat['chat_id'],
-                $chat['title'] ?? $chat['type'],
-                $record->is_active ? '' : ' [inactive]',
+                $chat['message_thread_id'] ?? '(General)',
+                $record->label(),
             ));
         }
+
+        $this->newLine();
+        $this->line('Topics only appear after the bot sees a message in them —');
+        $this->line('post "/start@edu_gate_bot" inside each topic you want to use.');
 
         if ($this->option('test')) {
             $sent = Telegram::broadcast(

@@ -31,6 +31,11 @@ class AlertRulesTable
                         ? Money::format((int) $state)
                         : '—')
                     ->alignEnd(),
+                TextColumn::make('telegramChat.chat_id')
+                    ->label('Send to')
+                    ->formatStateUsing(fn ($state, AlertRule $r) => $r->telegramChat?->label() ?? 'All destinations')
+                    ->badge()
+                    ->color(fn (AlertRule $r) => $r->telegramChat ? 'info' : 'gray'),
                 TextColumn::make('send_at')->label('Send at')->placeholder('—'),
                 TextColumn::make('updated_at')->label('Updated')->since()->toggleable(),
             ])

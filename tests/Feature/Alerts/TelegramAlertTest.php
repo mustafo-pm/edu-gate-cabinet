@@ -105,3 +105,54 @@ it('formats money in the alert body as UZS, not raw tiyin', function () {
     expect($body)->toContain('3 200 000.00 UZS')
         ->and($body)->toContain('ClickPay');
 });
+
+/**
+ * Forum topics: a destination is (chat + optional topic), and the thread id
+ * must reach sendMessage or the alert silently lands in "General".
+ */
+it('includes message_thread_id when the destination is a topic', function () {
+    Http::fake(fn () => Http::response(['ok' => true], 200));
+
+    $topic = TelegramChat::create([
+        'chat_id' => '-100777', 'message_thread_id' => '42',
+        'topic_name' => 'Payments', 'title' => 'Ops', 'is_active' => true,
+    ]);
+
+    Telegram::send($topic->chat_id, 'hi', 'test', $topic->message_thread_id);
+
+    Http::assertSent(fn ($r) => ($r->data()['message_thread_id'] ?? null) === 42);
+});
+
+it('omits message_thread_id for a plain chat', function () {
+    Http::fake(fn () => Http::response(['ok' => true], 200));
+
+    $chat = TelegramChat::create(['chat_id' => '-100888', 'title' => 'Ops', 'is_active' => true]);
+    Telegram::send($chat->chat_id, 'hi', 'test', $chat->message_thread_id);
+
+    Http::assertSent(fn ($r) => ! array_key_exists('message_thread_id', $r->data()));
+});
+
+it('sends only to the pinned destination when a rule targets one topic', function () {
+    Http::fake(fn () => Http::response(['ok' => true], 200));
+
+    TelegramChat::create(['chat_id' => '-100999', 'title' => 'Other', 'is_active' => true]);
+    $topic = TelegramChat::create([
+        'chat_id' => '-100777', 'message_thread_id' => '7',
+        'topic_name' => 'Alerts', 'title' => 'Ops', 'is_active' => true,
+    ]);
+
+    expect(Telegram::broadcast('<b>x</b>', 'test', $topic))->toBe(1);
+    Http::assertSentCount(1);
+    Http::assertSent(fn ($r) => $r->data()['chat_id'] === '-100777');
+});
+
+it('labels a topic destination distinctly from the chat', function () {
+    $chat = TelegramChat::create(['chat_id' => '-1', 'title' => 'Ops', 'is_active' => true]);
+    $topic = TelegramChat::create([
+        'chat_id' => '-1', 'message_thread_id' => '9', 'topic_name' => 'Payments',
+        'title' => 'Ops', 'is_active' => true,
+    ]);
+
+    expect($chat->label())->toBe('Ops')
+        ->and($topic->label())->toBe('Ops › Payments');
+});

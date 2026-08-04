@@ -75,6 +75,7 @@ class SendDailySummary extends Command
         $sent = Telegram::broadcast(
             Alerts::format(AlertEvent::DailySummary, $payload),
             AlertEvent::DailySummary->value,
+            $rule?->telegramChat,
         );
 
         $this->info("Daily summary for {$payload['date']}: {$payload['count']} payments, sent to {$sent} chat(s).");

@@ -27,6 +27,15 @@ class AlertRuleForm
                     Toggle::make('is_enabled')
                         ->label('Enabled')
                         ->helperText('Turn off to silence this alert without losing its settings.'),
+
+                    Select::make('telegram_chat_id')
+                        ->label('Send to')
+                        ->relationship('telegramChat', 'chat_id')
+                        ->getOptionLabelFromRecordUsing(fn (\App\Models\TelegramChat $r) => $r->label())
+                        ->searchable()
+                        ->preload()
+                        ->placeholder('All active destinations')
+                        ->helperText('Pick a specific chat or forum topic, or leave empty to send everywhere.'),
                 ]),
 
             Section::make('Settings')
