@@ -32,8 +32,13 @@ class AdminUser extends Authenticatable implements FilamentUser
         ];
     }
 
+    /**
+     * Cast rather than return the raw attribute: an unset or null flag must
+     * deny access, not raise a TypeError inside the auth middleware — that
+     * turns a failed login into a 500 on every admin page.
+     */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $this->is_active;
+        return (bool) $this->is_active;
     }
 }

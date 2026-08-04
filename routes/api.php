@@ -2,11 +2,21 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\PublicSiteController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\ReportController;
 use Illuminate\Support\Facades\Route;
+
+/*
+ * Public, unauthenticated content for the marketing site. Kept outside /v1 so
+ * it is never mistaken for part of the PSP contract. CORS for this prefix is
+ * pinned to the website origins in config/cors.php.
+ */
+Route::prefix('public')->middleware('throttle:120,1')->group(function () {
+    Route::get('site', [PublicSiteController::class, 'show'])->name('public.site');
+});
 
 /*
  * PSP-facing API — api.edu-gate.uz. Server-to-server, Sanctum bearer tokens.
