@@ -2,6 +2,13 @@
 
 return [
 
+    'telegram' => [
+        'token' => env('TELEGRAM_BOT_TOKEN'),
+        'api' => 'https://api.telegram.org',
+        'timeout' => 8,
+    ],
+
+
     /*
     |--------------------------------------------------------------------------
     | Third Party Services

@@ -19,6 +19,11 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Operational alerts (Telegram). Observers only queue work — the job
+        // is afterCommit, so a rolled-back payment never announces itself.
+        \App\Models\Deposit::observe(\App\Observers\DepositObserver::class);
+        \App\Models\Transaction::observe(\App\Observers\TransactionObserver::class);
+
         //
     }
 }
