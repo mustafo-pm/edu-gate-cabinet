@@ -53,9 +53,14 @@
                 <button type="submit" class="eg-btn eg-btn--primary w-full">{{ __('cabinet.auth.sign_in') }}</button>
             </form>
 
-            <p class="mt-6 text-center text-xs text-eg-muted">
-                merchant@ · psp@ · admin@edu-gate.uz — password
-            </p>
+            {{-- Demo credentials are for local/staging only and must never be
+                 rendered on a public production sign-in page. --}}
+            @production
+            @else
+                <p class="mt-6 text-center text-xs text-eg-muted">
+                    merchant@ · psp@ · admin@edu-gate.uz — password
+                </p>
+            @endproduction
         </div>
     </div>
 </div>

@@ -27,7 +27,13 @@ class TelegramChatsTable
                     ->badge()
                     ->color(fn (TelegramChat $r) => filled($r->message_thread_id) ? 'info' : 'gray'),
                 TextColumn::make('chat_id')->label('Chat ID')->fontFamily('mono')->searchable(),
-                TextColumn::make('type')->badge()->placeholder('—'),
+                TextColumn::make('type')
+                    ->badge()
+                    ->placeholder('—')
+                    ->color(fn ($state) => $state === 'private' ? 'warning' : 'gray')
+                    ->tooltip(fn ($state) => $state === 'private'
+                        ? 'A personal DM — alerts here go to one individual'
+                        : null),
                 IconColumn::make('is_active')->label('Active')->boolean(),
                 TextColumn::make('last_sent_at')->label('Last sent')->since()->placeholder('never'),
                 TextColumn::make('last_error')->label('Last error')->limit(30)->placeholder('—')->color('danger'),
@@ -52,18 +58,8 @@ class TelegramChatsTable
 
                         $new = 0;
                         foreach ($found as $chat) {
-                            // One row per chat+topic pair.
-                            $record = TelegramChat::updateOrCreate(
-                                [
-                                    'chat_id' => $chat['chat_id'],
-                                    'message_thread_id' => $chat['message_thread_id'],
-                                ],
-                                array_filter([
-                                    'title' => $chat['title'],
-                                    'type' => $chat['type'],
-                                    'topic_name' => $chat['topic_name'],
-                                ], fn ($v) => $v !== null),
-                            );
+                            // One row per chat+topic pair. Private chats register inactive.
+                            $record = TelegramChat::registerDiscovered($chat);
                             $new += $record->wasRecentlyCreated ? 1 : 0;
                         }
 

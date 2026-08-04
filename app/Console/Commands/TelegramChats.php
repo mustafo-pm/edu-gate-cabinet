@@ -44,23 +44,14 @@ class TelegramChats extends Command
         }
 
         foreach ($found as $chat) {
-            $record = TelegramChat::updateOrCreate(
-                [
-                    'chat_id' => $chat['chat_id'],
-                    'message_thread_id' => $chat['message_thread_id'],
-                ],
-                array_filter([
-                    'title' => $chat['title'],
-                    'type' => $chat['type'],
-                    'topic_name' => $chat['topic_name'],
-                ], fn ($v) => $v !== null),
-            );
+            $record = TelegramChat::registerDiscovered($chat);
 
-            $this->info(sprintf('%s  chat=%s  topic=%-18s %s',
+            $this->info(sprintf('%s  chat=%-18s topic=%-12s %-40s %s',
                 $record->wasRecentlyCreated ? 'added  ' : 'updated',
                 $chat['chat_id'],
                 $chat['message_thread_id'] ?? '(General)',
                 $record->label(),
+                $record->is_active ? '' : '[INACTIVE — private chat, enable it in the admin if intended]',
             ));
         }
 

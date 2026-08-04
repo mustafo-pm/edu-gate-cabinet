@@ -48,7 +48,11 @@
                 <button type="submit" class="eg-btn eg-btn--primary w-full">{{ __('cabinet.auth.sign_in') }}</button>
             </form>
 
-            <p class="mt-6 text-center text-xs text-eg-muted">psp@edu-gate.uz · password</p>
+            {{-- Demo credentials: never rendered in production. --}}
+            @production
+            @else
+                <p class="mt-6 text-center text-xs text-eg-muted">psp@edu-gate.uz · password</p>
+            @endproduction
         </div>
     </div>
 </div>

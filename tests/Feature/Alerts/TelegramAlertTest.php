@@ -156,3 +156,40 @@ it('labels a topic destination distinctly from the chat', function () {
     expect($chat->label())->toBe('Ops')
         ->and($topic->label())->toBe('Ops › Payments');
 });
+
+/**
+ * Discovery picks up anyone who ever messaged the bot, including personal DMs.
+ * Those must not start receiving payment alerts without a deliberate decision.
+ */
+it('registers a discovered private chat as inactive', function () {
+    $dm = TelegramChat::registerDiscovered([
+        'chat_id' => '155715710', 'message_thread_id' => null,
+        'title' => 'Ulugbek', 'type' => 'private', 'topic_name' => null,
+    ]);
+
+    expect($dm->is_active)->toBeFalse();
+});
+
+it('registers a discovered group as active', function () {
+    $group = TelegramChat::registerDiscovered([
+        'chat_id' => '-1004438062239', 'message_thread_id' => null,
+        'title' => 'Edu Gate', 'type' => 'supergroup', 'topic_name' => null,
+    ]);
+
+    expect($group->is_active)->toBeTrue();
+});
+
+it('never overwrites an is_active decision on re-discovery', function () {
+    $dm = TelegramChat::registerDiscovered([
+        'chat_id' => '43715401', 'message_thread_id' => null,
+        'title' => 'Muzaffar', 'type' => 'private',
+    ]);
+    $dm->update(['is_active' => true]);          // operator enabled it on purpose
+
+    TelegramChat::registerDiscovered([
+        'chat_id' => '43715401', 'message_thread_id' => null,
+        'title' => 'Muzaffar', 'type' => 'private',
+    ]);
+
+    expect($dm->fresh()->is_active)->toBeTrue();
+});

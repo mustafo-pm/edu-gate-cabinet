@@ -21,6 +21,36 @@ class TelegramChat extends Model
         return ['is_active' => 'boolean', 'last_sent_at' => 'datetime'];
     }
 
+    /**
+     * Register a destination found by discovery.
+     *
+     * New PRIVATE chats are created inactive on purpose: discovery picks up
+     * anyone who has ever messaged the bot, and payment alerts should not start
+     * flowing into someone's personal DMs without a deliberate decision. An
+     * existing row's is_active is never overwritten.
+     */
+    public static function registerDiscovered(array $data): self
+    {
+        $chat = static::firstOrNew([
+            'chat_id' => $data['chat_id'],
+            'message_thread_id' => $data['message_thread_id'] ?? null,
+        ]);
+
+        if (! $chat->exists) {
+            $chat->is_active = ($data['type'] ?? null) !== 'private';
+        }
+
+        $chat->fill(array_filter([
+            'title' => $data['title'] ?? null,
+            'type' => $data['type'] ?? null,
+            'topic_name' => $data['topic_name'] ?? null,
+        ], fn ($v) => $v !== null));
+
+        $chat->save();
+
+        return $chat;
+    }
+
     /** Human label, e.g. "Ops group › Payments". */
     public function label(): string
     {
