@@ -1,0 +1,1008 @@
+{
+  "info": {
+    "_postman_id": "e0d9a1c2-4f3b-4a71-9c55-9b1f2a7c0011",
+    "name": "EduGate PSP API v1",
+    "description": "Server-to-server API for Payment Service Providers.\n\n**Amounts are integer tiyin.** 1 UZS = 100 tiyin, so 120000000 tiyin = 1 200 000.00 UZS. Never send a decimal.\n\n**Envelope.** Success is `{\"status\":\"ok\",\"data\":…}`; a handled error is `{\"status\":\"error\",\"error\":{\"code\",\"message\"}}`. Two cases still fall back to Laravel's default shape — see the \"Error cases\" folder.\n\n**Run order.** `Auth → Login` first: its test script stores the bearer token, and every other request inherits it. Then `Payments → Check` (stores `check_id`) before `Confirm`.\n\n**Confirm moves money.** It debits the PSP deposit and writes append-only rows that cannot be deleted. Point `base_url` at a local or sandbox cabinet unless you intend a real transaction.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{access_token}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://127.0.0.1:8123",
+      "type": "string"
+    },
+    {
+      "key": "key_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "secret",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "access_token",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "institution_id",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "student_id_number",
+      "value": "STU-0002",
+      "type": "string"
+    },
+    {
+      "key": "check_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "transaction_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "partner_transaction_id",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "idempotency_key",
+      "value": "",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "0 · Public",
+      "item": [
+        {
+          "name": "Site showcase (partners + trust figures)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/public/site",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "public",
+                "site"
+              ]
+            },
+            "description": "Unauthenticated feed the marketing site reads. Curated partner logos and rounded trust figures only — it exposes no tenant or financial data. Cached ~10 min."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('envelope is ok', () => pm.expect(b.status).to.eql('ok'));",
+                  "pm.test('has groups and stats', () => {",
+                  "    pm.expect(b.data).to.have.property('groups');",
+                  "    pm.expect(b.data).to.have.property('stats');",
+                  "});",
+                  "pm.test('never exposes money', () => {",
+                  "    const raw = pm.response.text().toLowerCase();",
+                  "    ['amount', 'balance', 'tiyin', 'turnover', 'revenue'].forEach(w =>",
+                  "        pm.expect(raw, 'forbidden key: ' + w).to.not.include(w));",
+                  "});"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "1 · Auth",
+      "item": [
+        {
+          "name": "Login (API key → bearer token)",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key_id\": \"{{key_id}}\",\n  \"secret\": \"{{secret}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Exchange an API key pair for a Sanctum bearer token.\n\nThe token carries an ability of `env:sandbox` or `env:live`, so a sandbox key can never act on live data.\n\nRun this first — the test script stores `access_token` for every other request."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Write to the active environment when there is one — an environment value",
+                  "// otherwise shadows the collection variable and the request sends a stale blank.",
+                  "const put = (k, v) => (pm.environment.name ? pm.environment : pm.collectionVariables).set(k, v);",
+                  "",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const b = pm.response.json();",
+                  "pm.test('envelope is ok', () => pm.expect(b.status).to.eql('ok'));",
+                  "pm.test('returns a bearer token', () => {",
+                  "    pm.expect(b.data.access_token).to.be.a('string').and.not.empty;",
+                  "    pm.expect(b.data.token_type).to.eql('Bearer');",
+                  "});",
+                  "put('access_token', b.data.access_token);",
+                  "console.log('Signed in as', b.data.psp.name, '·', b.data.environment);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2 · Catalog",
+      "item": [
+        {
+          "name": "List categories",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/categories",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ]
+            },
+            "description": "The three institution categories with a count of active institutions in each: `university`, `school`, `kindergarten`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('three categories', () => pm.expect(d).to.have.lengthOf(3));",
+                  "pm.test('counts are integers', () =>",
+                  "    d.forEach(c => pm.expect(c.institutions_count).to.be.a('number')));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Institutions in a category",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/categories/university/institutions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "university",
+                "institutions"
+              ]
+            },
+            "description": "Active institutions only. Swap `university` for `school` or `kindergarten`.\n\nThe `id` returned here is the `institution_id` that Check expects."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Write to the active environment when there is one — an environment value",
+                  "// otherwise shadows the collection variable and the request sends a stale blank.",
+                  "const put = (k, v) => (pm.environment.name ? pm.environment : pm.collectionVariables).set(k, v);",
+                  "",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "if (d.length) {",
+                  "    put('institution_id', String(d[0].id));",
+                  "    console.log('Using institution', d[0].id, d[0].name);",
+                  "}"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "3 · Payments",
+      "item": [
+        {
+          "name": "Check — student + amount owed",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"institution_id\": {{institution_id}},\n  \"student_id_number\": \"{{student_id_number}}\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/check",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "check"
+              ]
+            },
+            "description": "Step 1. Resolves the student and what they owe, and issues a `check_id` valid for **15 minutes**.\n\nOmit `amount` (as here) and you get the full outstanding balance. Send `\"amount\": 50000000` to quote a part payment instead.\n\nMoves no money. The check lives in cache, not the database."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Write to the active environment when there is one — an environment value",
+                  "// otherwise shadows the collection variable and the request sends a stale blank.",
+                  "const put = (k, v) => (pm.environment.name ? pm.environment : pm.collectionVariables).set(k, v);",
+                  "",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('issues a check_id', () => pm.expect(d.check_id).to.match(/^chk_/));",
+                  "pm.test('amount is integer tiyin', () => {",
+                  "    pm.expect(d.amount_owed).to.be.a('number');",
+                  "    pm.expect(d.amount_owed % 1, 'must not be fractional').to.eql(0);",
+                  "});",
+                  "pm.test('currency is UZS', () => pm.expect(d.currency).to.eql('UZS'));",
+                  "put('check_id', d.check_id);",
+                  "console.log('Owed:', (d.amount_owed / 100).toLocaleString(), 'UZS by', d.student.name);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm — finalize (MOVES MONEY)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "{{idempotency_key}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"check_id\": \"{{check_id}}\",\n  \"partner_transaction_id\": \"{{partner_transaction_id}}\",\n  \"amount\": 120000000,\n  \"gateway\": \"click\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/confirm",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "confirm"
+              ]
+            },
+            "description": "Step 2. Debits the PSP deposit, records commission, and applies the payment to the student's oldest unpaid schedules — all in one database transaction.\n\n`Idempotency-Key` is **required** (428 without it).\n\nDeduplication is on `(psp_id, partner_transaction_id)`, not on the header: replaying the same `partner_transaction_id` returns the original transaction untouched, even with a different key or amount. That is what makes a retry after a network timeout safe.\n\nThe pre-request script mints a fresh pair of ids on every run so this request always creates a new payment. The next request replays them deliberately.\n\n**amount is in tiyin** — 120000000 = 1 200 000.00 UZS."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "prerequest",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Write to the active environment when there is one — an environment value",
+                  "// otherwise shadows the collection variable and the request sends a stale blank.",
+                  "const put = (k, v) => (pm.environment.name ? pm.environment : pm.collectionVariables).set(k, v);",
+                  "",
+                  "// Fresh ids per run, so this request always creates a NEW payment.",
+                  "const stamp = Date.now();",
+                  "put('partner_transaction_id', 'PT-' + stamp);",
+                  "put('idempotency_key', 'idem-' + stamp);"
+                ]
+              }
+            },
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Write to the active environment when there is one — an environment value",
+                  "// otherwise shadows the collection variable and the request sends a stale blank.",
+                  "const put = (k, v) => (pm.environment.name ? pm.environment : pm.collectionVariables).set(k, v);",
+                  "",
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('completed', () => pm.expect(d.status).to.eql('completed'));",
+                  "pm.test('net = amount - commission', () =>",
+                  "    pm.expect(d.net_amount).to.eql(d.amount - d.commission_amount));",
+                  "pm.test('all amounts are whole tiyin', () =>",
+                  "    ['amount', 'commission_amount', 'net_amount'].forEach(k =>",
+                  "        pm.expect(d[k] % 1, k + ' must not be fractional').to.eql(0)));",
+                  "put('transaction_id', String(d.id));",
+                  "console.log('Txn', d.id, '· paid', (d.amount / 100).toLocaleString(),",
+                  "            'UZS · commission', (d.commission_amount / 100).toLocaleString());"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Confirm — idempotent replay (no double charge)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "a-completely-different-key"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"check_id\": \"{{check_id}}\",\n  \"partner_transaction_id\": \"{{partner_transaction_id}}\",\n  \"amount\": 999999999,\n  \"gateway\": \"click\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/confirm",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "confirm"
+              ]
+            },
+            "description": "Reuses the previous `partner_transaction_id` with a different Idempotency-Key AND a different amount.\n\nExpected: the ORIGINAL transaction comes back unchanged — same id, same amount. Nothing is charged twice. Run this straight after Confirm."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json().data;",
+                  "pm.test('returns the ORIGINAL transaction', () =>",
+                  "    pm.expect(String(d.id)).to.eql(pm.variables.get('transaction_id')));",
+                  "pm.test('amount was NOT overwritten by the replay', () =>",
+                  "    pm.expect(d.amount).to.not.eql(999999999));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Get payment status",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/{{transaction_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "{{transaction_id}}"
+              ]
+            },
+            "description": "Scoped to the calling PSP — another PSP's transaction id returns 404, not 403, so ids cannot be probed."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('is the transaction we created', () =>",
+                  "    pm.expect(String(pm.response.json().data.id)).to.eql(pm.variables.get('transaction_id')));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "4 · Reports",
+      "item": [
+        {
+          "name": "Payment registry",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/reports/payments?per_page=25",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "reports",
+                "payments"
+              ],
+              "query": [
+                {
+                  "key": "per_page",
+                  "value": "25",
+                  "description": "max 200"
+                },
+                {
+                  "key": "from",
+                  "value": "2026-01-01",
+                  "disabled": true
+                },
+                {
+                  "key": "to",
+                  "value": "2026-12-31",
+                  "disabled": true
+                },
+                {
+                  "key": "status",
+                  "value": "completed",
+                  "description": "pending|completed|cancelled|refunded",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "The calling PSP's own payments, newest first. `from`/`to` filter on `paid_at`. Enable the disabled query params to try the filters."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "const d = pm.response.json().data;",
+                  "pm.test('paginated', () => {",
+                  "    pm.expect(d).to.have.property('items');",
+                  "    pm.expect(d.meta).to.have.all.keys('current_page', 'last_page', 'total');",
+                  "});",
+                  "console.log('Registry:', d.meta.total, 'payments across', d.meta.last_page, 'pages');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "5 · Error cases",
+      "description": "Each request here is expected to FAIL, with the code and status named in its title. Run them to see exactly what your error handling must cope with.",
+      "item": [
+        {
+          "name": "401 invalid_credentials",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"key_id\": \"egk_wrong\",\n  \"secret\": \"not-the-secret\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "login"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));",
+                  "pm.test('code is invalid_credentials', () =>",
+                  "    pm.expect(pm.response.json().error.code).to.eql('invalid_credentials'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "401 unauthenticated (no token) — NOTE: different shape",
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/categories",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories"
+              ]
+            },
+            "description": "A missing or expired token is rejected by the framework before the controller runs, so the body is `{\"message\":\"Unauthenticated.\"}` — NOT the `{status,error}` envelope.\n\nParse defensively: check the HTTP status first, and only then look for `error.code`."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('401', () => pm.response.to.have.status(401));",
+                  "pm.test('falls back to Laravel default shape', () =>",
+                  "    pm.expect(pm.response.json()).to.have.property('message'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 unknown_category",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/categories/college/institutions",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "categories",
+                "college",
+                "institutions"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));",
+                  "pm.test('code is unknown_category', () =>",
+                  "    pm.expect(pm.response.json().error.code).to.eql('unknown_category'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "428 idempotency_key_required",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"check_id\": \"chk_anything\",\n  \"partner_transaction_id\": \"PT-NO-IDEM-KEY\",\n  \"amount\": 100000,\n  \"gateway\": \"click\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/confirm",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "confirm"
+              ]
+            },
+            "description": "Confirm with no `Idempotency-Key` header. Rejected before any money logic runs."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('428 Precondition Required', () => pm.response.to.have.status(428));",
+                  "pm.test('code is idempotency_key_required', () =>",
+                  "    pm.expect(pm.response.json().error.code).to.eql('idempotency_key_required'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "410 check_expired",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "idem-expired-check"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"check_id\": \"chk_doesnotexist000000000\",\n  \"partner_transaction_id\": \"PT-EXPIRED-CHECK\",\n  \"amount\": 100000,\n  \"gateway\": \"click\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/confirm",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "confirm"
+              ]
+            },
+            "description": "An unknown or >15-minute-old `check_id`. Re-run Check to get a fresh one."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('410 Gone', () => pm.response.to.have.status(410));",
+                  "pm.test('code is check_expired', () =>",
+                  "    pm.expect(pm.response.json().error.code).to.eql('check_expired'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "402 insufficient_deposit",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              },
+              {
+                "key": "Idempotency-Key",
+                "value": "idem-too-big"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"check_id\": \"{{check_id}}\",\n  \"partner_transaction_id\": \"PT-EXCEEDS-DEPOSIT\",\n  \"amount\": 99000000000000,\n  \"gateway\": \"click\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/confirm",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "confirm"
+              ]
+            },
+            "description": "An amount larger than the PSP's prepaid deposit. Nothing is written — the whole database transaction rolls back.\n\nNeeds a live `check_id`, so run Check first."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('402 Payment Required', () => pm.response.to.have.status(402));",
+                  "pm.test('code is insufficient_deposit', () =>",
+                  "    pm.expect(pm.response.json().error.code).to.eql('insufficient_deposit'));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "422 validation — NOTE: different shape",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"institution_id\": 999999,\n  \"student_id_number\": \"\"\n}"
+            },
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/check",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "check"
+              ]
+            },
+            "description": "Check returns Laravel's default `{message, errors}` on a validation failure, whereas Confirm returns the `{status,error}` envelope with code `validation_failed`. Same class of failure, two shapes — handle both until this is unified."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('422', () => pm.response.to.have.status(422));",
+                  "const b = pm.response.json();",
+                  "pm.test('field errors are present in some form', () =>",
+                  "    pm.expect(b.errors || (b.error && b.error.fields)).to.exist);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "404 not_found (payment)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/payments/999999999",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "payments",
+                "999999999"
+              ]
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('404', () => pm.response.to.have.status(404));",
+                  "pm.test('code is not_found', () =>",
+                  "    pm.expect(pm.response.json().error.code).to.eql('not_found'));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "6 · End session",
+      "description": "Runs last so a full-collection run does not revoke its own token halfway through.",
+      "item": [
+        {
+          "name": "Logout (revoke current token)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Accept",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/api/v1/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "api",
+                "v1",
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Revokes the token in use.\n\nDeliberately the LAST item in the collection: newman and Postman's Collection Runner execute items in order, and revoking mid-run would 401 everything after it."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "// Write to the active environment when there is one — an environment value",
+                  "// otherwise shadows the collection variable and the request sends a stale blank.",
+                  "const put = (k, v) => (pm.environment.name ? pm.environment : pm.collectionVariables).set(k, v);",
+                  "",
+                  "pm.test('200 OK', () => pm.response.to.have.status(200));",
+                  "pm.test('revoked', () => pm.expect(pm.response.json().data.revoked).to.be.true);",
+                  "put('access_token', '');"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
