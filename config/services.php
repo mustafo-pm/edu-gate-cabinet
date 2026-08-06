@@ -8,7 +8,6 @@ return [
         'timeout' => 8,
     ],
 
-
     /*
     |--------------------------------------------------------------------------
     | Third Party Services
@@ -40,6 +39,20 @@ return [
             'bot_user_oauth_token' => env('SLACK_BOT_USER_OAUTH_TOKEN'),
             'channel' => env('SLACK_BOT_USER_DEFAULT_CHANNEL'),
         ],
+    ],
+
+    /*
+     * Aloqabank A2A. Only the base URL differs between the simulator and the
+     * real bank — the client, auth and parsing are identical, which is what
+     * makes the simulator worth running. The driver refuses a /sim/ URL when
+     * APP_ENV=production.
+     */
+    'aloqabank' => [
+        'base_url' => env('ALOQABANK_BASE_URL', env('APP_URL', 'http://127.0.0.1:8000').'/sim/aloqabank/api/v2'),
+        'username' => env('ALOQABANK_USERNAME', 'rpay'),
+        'password' => env('ALOQABANK_PASSWORD', 'p@ssw0rd'),
+        'service_id' => env('ALOQABANK_SERVICE_ID', 33),
+        'timeout' => (int) env('ALOQABANK_TIMEOUT', 15),
     ],
 
 ];

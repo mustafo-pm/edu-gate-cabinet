@@ -15,3 +15,10 @@ Schedule::command('edugate:daily-summary')
     ->hourly()
     ->timezone('Asia/Tashkent')
     ->withoutOverlapping();
+
+// Banks accept a payment order and settle it later, so postings sitting at
+// `sent` have to be chased or the register never learns whether the money
+// arrived. Frequent because the product promises settlement in seconds.
+Schedule::command('transfers:poll')
+    ->everyMinute()
+    ->withoutOverlapping();

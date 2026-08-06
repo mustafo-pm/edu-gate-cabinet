@@ -8,8 +8,11 @@ use App\Enums\LedgerType;
 use App\Enums\ScheduleStatus;
 use App\Enums\TransactionStatus;
 use App\Exceptions\PaymentException;
+use App\Jobs\SettlePayment;
 use App\Models\Deposit;
+use App\Models\Merchant;
 use App\Models\PaymentSchedule;
+use App\Models\Psp;
 use App\Models\Student;
 use App\Models\Transaction;
 use Illuminate\Support\Facades\Cache;
@@ -56,13 +59,13 @@ class ConfirmPayment
         $student = Student::withoutGlobalScopes()->findOrFail($check['student_id']);
         $merchantId = (int) $check['merchant_id'];
 
-        $psp = \App\Models\Psp::findOrFail($pspId);
-        $merchant = \App\Models\Merchant::findOrFail($merchantId);
+        $psp = Psp::findOrFail($pspId);
+        $merchant = Merchant::findOrFail($merchantId);
 
         $commission = $this->resolveCommission->handle($psp, $merchant, $amountTiyin);
         $net = $amountTiyin - $commission;
 
-        return DB::transaction(function () use (
+        $transaction = DB::transaction(function () use (
             $pspId, $merchantId, $student, $partnerTransactionId, $amountTiyin,
             $commission, $net, $idempotencyKey, $gateway, $checkId
         ) {
@@ -111,6 +114,19 @@ class ConfirmPayment
 
             return $txn;
         });
+
+        // 7. Settle onward to the institution's bank.
+        //
+        // Deliberately AFTER the transaction and on a queue: the payment has
+        // already succeeded and the deposit is debited, so a slow or broken
+        // bank must not be able to fail or roll any of that back. afterCommit
+        // keeps it correct if this action is ever called inside an outer
+        // transaction.
+        if (config('settlement.auto')) {
+            SettlePayment::dispatch($transaction->id)->afterCommit();
+        }
+
+        return $transaction;
     }
 
     /** Distribute a paid amount across outstanding schedules, oldest due first. */
