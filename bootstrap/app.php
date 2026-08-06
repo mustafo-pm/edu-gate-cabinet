@@ -4,6 +4,7 @@ use App\Exceptions\PaymentException;
 use App\Http\Controllers\Api\ApiIndexController;
 use App\Http\Middleware\EnforceHost;
 use App\Http\Middleware\SetLocale;
+use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -77,6 +78,25 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->web(append: [
             SetLocale::class,
         ]);
+
+        // EnforceHost must beat the auth check.
+        //
+        // Laravel sorts route middleware by its priority list, and
+        // Illuminate\Auth\Middleware\Authenticate is in it — Filament's own
+        // Authenticate extends that class, and the sorter walks parents, so it
+        // matches too. Middleware NOT in the list keeps its relative position,
+        // which let Authenticate be hoisted in front of EnforceHost: a
+        // wrong-host request to /admin answered 302 to the login page,
+        // confirming both that the panel exists and where it lives. Precisely
+        // what the 404 was there to prevent.
+        $middleware->prependToPriorityList(
+            // The list keys auth by the INTERFACE, not the concrete class.
+            // Naming Illuminate\Auth\Middleware\Authenticate here matches
+            // nothing, and prependToPriorityList silently appends to the end
+            // instead — which is exactly where EnforceHost was already sitting.
+            before: AuthenticatesRequests::class,
+            prepend: EnforceHost::class,
+        );
 
         $middleware->alias([
             'host' => EnforceHost::class,

@@ -102,3 +102,43 @@ it('does not register the API root until a host is pinned', function () {
     expect($roots)->toHaveCount(1)
         ->and($roots->first())->not->toContain('ApiIndexController');
 });
+
+/**
+ * Regression, found in deployment: api.edu-gate.uz/admin answered 302 to the
+ * cabinet instead of 404.
+ *
+ * EnforceHost was on the Filament panel, but Laravel sorts route middleware by
+ * its priority list and Authenticate is in it — Filament's own Authenticate
+ * extends Illuminate's, and the sorter walks parent classes. Unprioritised
+ * middleware keeps its position, so the auth redirect fired first and told an
+ * anonymous prober both that a panel exists and which host serves it.
+ *
+ * These assert the RESPONSE, not the presence of the middleware. The earlier
+ * test asserted a probe route 404s, which stayed true while the real panel
+ * leaked, because that probe had no auth middleware to be overtaken by.
+ */
+it('answers 404, not a redirect, for the admin panel on the wrong host', function () {
+    config(['domains.admin' => 'cabinet.edu-gate.uz']);
+
+    $response = $this->get('http://api.edu-gate.uz/admin');
+
+    expect($response->getStatusCode())->toBe(404)
+        // A 302 would name the real host in Location.
+        ->and($response->headers->get('Location'))->toBeNull();
+});
+
+it('does not leak the admin host through any panel path', function (string $path) {
+    config(['domains.admin' => 'cabinet.edu-gate.uz']);
+
+    $response = $this->get('http://api.edu-gate.uz'.$path);
+
+    expect($response->getStatusCode())->toBe(404)
+        ->and((string) $response->headers->get('Location'))->not->toContain('cabinet.edu-gate.uz');
+})->with(['/admin', '/admin/login', '/admin/bank-transfers', '/admin/partners']);
+
+it('still serves the admin panel on its own host', function () {
+    config(['domains.admin' => 'cabinet.edu-gate.uz']);
+
+    // A guest is redirected to sign in — that is the panel working, not leaking.
+    $this->get('http://cabinet.edu-gate.uz/admin')->assertRedirect();
+});
