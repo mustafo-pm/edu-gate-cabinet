@@ -35,11 +35,11 @@ class RuntimeConfigProvider extends ServiceProvider
         }
 
         $host = Settings::get('mail_host');
-        $port = (int) Settings::get('mail_port', 587);
+        $port = (int) Settings::get('mail_port', 465);
 
         // 'null' rather than null: Symfony's transport treats the string
         // 'null' as "no encryption", and the form offers it as an option.
-        $encryption = Settings::get('mail_encryption', 'tls');
+        $encryption = Settings::get('mail_encryption', 'ssl');
 
         config([
             'mail.default' => 'smtp',

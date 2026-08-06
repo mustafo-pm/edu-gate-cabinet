@@ -55,8 +55,8 @@ class MailSettings extends Page implements HasForms
     {
         $this->form->fill([
             'mail_host' => Settings::get('mail_host'),
-            'mail_port' => Settings::get('mail_port', 587),
-            'mail_encryption' => Settings::get('mail_encryption', 'tls'),
+            'mail_port' => Settings::get('mail_port', 465),
+            'mail_encryption' => Settings::get('mail_encryption', 'ssl'),
             'mail_username' => Settings::get('mail_username'),
             // Never the stored secret: it would then sit in the page source.
             'mail_password' => null,
@@ -77,19 +77,30 @@ class MailSettings extends Page implements HasForms
                         TextInput::make('mail_host')
                             ->label('Host')
                             ->placeholder('mail.edu-gate.uz')
-                            ->helperText('Your hosting control panel lists this under mail configuration.'),
+                            // cPanel's "Connect Devices" page shows the bare
+                            // domain (edu-gate.uz), and on shared hosting that
+                            // name is frequently absent from the certificate
+                            // the mail server presents — which fails as
+                            // "certificate verify failed" and reads like a
+                            // password problem. The mail.* name usually has its
+                            // own certificate.
+                            ->helperText('Use the name the mail server\'s certificate is issued for — usually '
+                                .'mail.yourdomain. The bare domain shown by cPanel often is NOT on that '
+                                .'certificate, which fails the TLS check rather than the login.'),
 
                         Select::make('mail_encryption')
                             ->label('Encryption')
                             ->options(['tls' => 'TLS (usually port 587)', 'ssl' => 'SSL (usually port 465)', 'none' => 'None'])
-                            ->default('tls')
+                            // cPanel labels its recommended block "Secure
+                            // SSL/TLS Settings" and offers only 465 there.
+                            ->default('ssl')
                             ->native(false)
                             ->live(),
 
                         TextInput::make('mail_port')
                             ->label('Port')
                             ->numeric()
-                            ->default(587)
+                            ->default(465)
                             ->helperText(fn (Get $get) => match ($get('mail_encryption')) {
                                 'ssl' => 'SSL normally uses 465.',
                                 'none' => 'Unencrypted submission normally uses 25 or 587.',
@@ -98,7 +109,7 @@ class MailSettings extends Page implements HasForms
 
                         TextInput::make('mail_username')
                             ->label('Username')
-                            ->placeholder('noreply@edu-gate.uz')
+                            ->placeholder('no-reply@edu-gate.uz')
                             ->helperText('Usually the full mailbox address.'),
 
                         TextInput::make('mail_password')
@@ -119,7 +130,7 @@ class MailSettings extends Page implements HasForms
                         TextInput::make('mail_from_address')
                             ->label('From address')
                             ->email()
-                            ->placeholder('noreply@edu-gate.uz'),
+                            ->placeholder('no-reply@edu-gate.uz'),
 
                         TextInput::make('mail_from_name')
                             ->label('From name')
