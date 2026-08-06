@@ -128,3 +128,42 @@ it('fails rather than guessing when no bank matches a driver', function () {
 
     $this->artisan('demo:reset --no-interaction')->assertFailed();
 });
+
+/**
+ * Found in deployment: the settlement account stayed at the recipient's bank
+ * even after the creation path was fixed. An account already existed, so the
+ * early return handed it back untouched and the wrong row survived every reset.
+ */
+it('moves a demo settlement account left at the wrong bank', function () {
+    $wrong = Bank::create(['code' => '00014', 'slug' => 'budget', 'name_uz' => 'Budget']);
+    SettlementAccount::create([
+        'bank_id' => $wrong->id, 'label' => 'DEMO — Budget simulator',
+        'account' => '20208000405273320010', 'mfo' => '00004', 'tax' => '301234567',
+        'holder_name' => 'EduGate LLC (demo)', 'driver' => 'aloqabank',
+        'is_default' => true, 'is_active' => true,
+    ]);
+    config(['services.aloqabank.base_url' => 'http://localhost/sim/aloqabank/api/v2']);
+
+    $this->artisan('demo:reset --no-interaction')->assertSuccessful();
+
+    $rail = Bank::where('slug', 'aloqabank')->first();
+
+    expect(SettlementAccount::first()->bank_id)->toBe($rail->id);
+});
+
+it('never rewrites a real settlement account', function () {
+    $wrong = Bank::create(['code' => '00014', 'slug' => 'budget', 'name_uz' => 'Budget']);
+    $real = SettlementAccount::create([
+        'bank_id' => $wrong->id, 'label' => 'Aloqabank — main operating account',
+        'account' => '99999999999999999999', 'mfo' => '00004', 'tax' => '301234567',
+        'holder_name' => 'EduGate LLC', 'driver' => 'aloqabank',
+        'is_default' => true, 'is_active' => true,
+    ]);
+    config(['services.aloqabank.base_url' => 'http://localhost/sim/aloqabank/api/v2']);
+
+    $this->artisan('demo:reset --no-interaction')->assertSuccessful();
+
+    // Someone's typed-in banking requisites. Report it; never silently move it.
+    expect($real->fresh()->bank_id)->toBe($wrong->id)
+        ->and($real->fresh()->account)->toBe('99999999999999999999');
+});

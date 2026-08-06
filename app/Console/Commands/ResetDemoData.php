@@ -53,6 +53,9 @@ class ResetDemoData extends Command
 
     protected $description = 'Delete all tenant/money data and seed one university, three students and one PSP';
 
+    /** Marks an account this command created, and may therefore correct. */
+    private const DEMO_LABEL = 'DEMO — ';
+
     public function __construct(private readonly A2aDriverManager $drivers)
     {
         parent::__construct();
@@ -208,6 +211,44 @@ class ResetDemoData extends Command
     }
 
     /**
+     * Correct a demo account this command created at the wrong bank.
+     *
+     * The earlier bug put our settlement account at the RECIPIENT's bank rather
+     * than the rail's. Fixing the creation path was not enough: an account
+     * already existed on the server, so the early return handed it straight back
+     * and the wrong row survived every subsequent reset.
+     *
+     * Only rows this command labelled DEMO are touched. A real account holds
+     * someone's typed-in banking requisites — it is reported and left alone,
+     * because silently rewriting where money leaves from is never this
+     * command's call to make.
+     */
+    private function healDemoAccount(SettlementAccount $account, Bank $rail): SettlementAccount
+    {
+        if ($account->bank_id === $rail->id) {
+            return $account;
+        }
+
+        if (! str_starts_with((string) $account->label, self::DEMO_LABEL)) {
+            $this->warn("Settlement account '{$account->label}' is not at {$rail->name_uz}, the bank we hold a driver for.");
+            $this->warn('It carries real requisites, so it has been left untouched. Check Accounting → Our accounts.');
+
+            return $account;
+        }
+
+        $account->forceFill([
+            'bank_id' => $rail->id,
+            'label' => self::DEMO_LABEL.$rail->name_uz.' simulator',
+            'mfo' => BankBranch::where('bank_id', $rail->id)->value('mfo') ?? $rail->code,
+            'driver' => $rail->a2a_driver,
+        ])->save();
+
+        $this->warn("Demo settlement account moved to {$rail->name_uz} — it was at the wrong bank.");
+
+        return $account;
+    }
+
+    /**
      * The account we send FROM. Without one, every posting blocks on
      * "No active settlement account to send from for this bank" — which is a
      * correct refusal but makes for a demo that provably cannot complete.
@@ -222,7 +263,7 @@ class ResetDemoData extends Command
         $existing = SettlementAccount::where('is_active', true)->first();
 
         if ($existing) {
-            return $existing;
+            return $this->healDemoAccount($existing, $rail);
         }
 
         $base = (string) config('services.aloqabank.base_url');
@@ -239,7 +280,7 @@ class ResetDemoData extends Command
         // bank we have no relationship with.
         $account = SettlementAccount::create([
             'bank_id' => $rail->id,
-            'label' => 'DEMO — '.$rail->name_uz.' simulator',
+            'label' => self::DEMO_LABEL.$rail->name_uz.' simulator',
             // Matches the partner account the simulator seeds for service 33.
             'account' => '20208000405273320010',
             'mfo' => BankBranch::where('bank_id', $rail->id)->value('mfo') ?? $rail->code,
