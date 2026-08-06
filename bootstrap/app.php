@@ -3,6 +3,7 @@
 use App\Exceptions\PaymentException;
 use App\Http\Controllers\Api\ApiIndexController;
 use App\Http\Middleware\EnforceHost;
+use App\Http\Middleware\RequirePasswordChange;
 use App\Http\Middleware\SetLocale;
 use Illuminate\Contracts\Auth\Middleware\AuthenticatesRequests;
 use Illuminate\Foundation\Application;
@@ -100,6 +101,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'host' => EnforceHost::class,
+            'password.change' => RequirePasswordChange::class,
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
             'role_or_permission' => RoleOrPermissionMiddleware::class,

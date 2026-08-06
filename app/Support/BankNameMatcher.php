@@ -19,8 +19,9 @@ use App\Models\Bank;
 final class BankNameMatcher
 {
     /** Cyrillic characters that look like Latin ones, as they appear in this data. */
-    private const CYR = ['А','В','Е','К','М','Н','О','Р','С','Т','У','Х','З','І','Ј','а','в','е','к','м','н','о','р','с','т','у','х'];
-    private const LAT = ['A','B','E','K','M','H','O','P','C','T','Y','X','3','I','J','a','b','e','k','m','h','o','p','c','t','y','x'];
+    private const CYR = ['А', 'В', 'Е', 'К', 'М', 'Н', 'О', 'Р', 'С', 'Т', 'У', 'Х', 'З', 'І', 'Ј', 'а', 'в', 'е', 'к', 'м', 'н', 'о', 'р', 'с', 'т', 'у', 'х'];
+
+    private const LAT = ['A', 'B', 'E', 'K', 'M', 'H', 'O', 'P', 'C', 'T', 'Y', 'X', '3', 'I', 'J', 'a', 'b', 'e', 'k', 'm', 'h', 'o', 'p', 'c', 't', 'y', 'x'];
 
     /**
      * Extra spellings per bank slug. The registry uses old names, Russian

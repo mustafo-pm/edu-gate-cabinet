@@ -64,6 +64,9 @@ class AdminPanelProvider extends PanelProvider
             ])
             ->authMiddleware([
                 Authenticate::class,
+                // After Authenticate on purpose — it needs a user before it can
+                // ask whether that user still holds a temporary password.
+                \App\Http\Middleware\RequirePasswordChange::class,
             ]);
     }
 }

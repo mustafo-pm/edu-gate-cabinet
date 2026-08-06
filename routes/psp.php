@@ -19,7 +19,7 @@ Route::middleware('guest:psp')->group(function () {
     Route::post('login', [AuthController::class, 'attempt'])->name('login.attempt');
 });
 
-Route::middleware('auth:psp')->group(function () {
+Route::middleware(['auth:psp', 'password.change'])->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
     Route::get('/', Dashboard::class)->name('dashboard');

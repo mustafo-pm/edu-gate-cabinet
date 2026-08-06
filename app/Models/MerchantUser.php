@@ -18,7 +18,7 @@ class MerchantUser extends Authenticatable
     protected string $guard_name = 'merchant';
 
     protected $fillable = [
-        'merchant_id', 'name', 'email', 'phone', 'password', 'is_active',
+        'merchant_id', 'name', 'email', 'phone', 'password', 'must_change_password', 'password_changed_at', 'is_active',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -29,6 +29,8 @@ class MerchantUser extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'must_change_password' => 'boolean',
+            'password_changed_at' => 'datetime',
         ];
     }
 

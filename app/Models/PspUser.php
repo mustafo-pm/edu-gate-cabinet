@@ -17,7 +17,7 @@ class PspUser extends Authenticatable
     protected string $guard_name = 'psp';
 
     protected $fillable = [
-        'psp_id', 'name', 'email', 'phone', 'password', 'is_active',
+        'psp_id', 'name', 'email', 'phone', 'password', 'must_change_password', 'password_changed_at', 'is_active',
     ];
 
     protected $hidden = ['password', 'remember_token'];
@@ -28,6 +28,8 @@ class PspUser extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'is_active' => 'boolean',
+            'must_change_password' => 'boolean',
+            'password_changed_at' => 'datetime',
         ];
     }
 

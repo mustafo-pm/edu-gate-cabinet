@@ -16,6 +16,8 @@ enum AlertEvent: string
     case DepositToppedUp = 'deposit_topped_up'; // a PSP credited their deposit
     case PaymentReceived = 'payment_received';  // tuition paid by a student
     case DailySummary = 'daily_summary';        // yesterday's volume + count
+    case UserCreated = 'user_created';           // a cabinet account was opened
+    case PasswordReset = 'password_reset';       // an account's password was revoked and reissued
 
     public function label(): string
     {
@@ -24,6 +26,8 @@ enum AlertEvent: string
             self::DepositToppedUp => 'Deposit topped up',
             self::PaymentReceived => 'Tuition payment received',
             self::DailySummary => 'Daily summary',
+            self::UserCreated => 'Cabinet user created',
+            self::PasswordReset => 'Password reset',
         };
     }
 
@@ -34,6 +38,8 @@ enum AlertEvent: string
             self::DepositToppedUp => 'Fires when a PSP adds funds to their prepaid deposit.',
             self::PaymentReceived => 'Fires on every completed tuition payment. Use the minimum amount to keep it quiet.',
             self::DailySummary => 'Sent once a day with the previous day\'s total volume, commission and transaction count.',
+            self::UserCreated => 'Fires when an admin opens a merchant, partner or admin account. The temporary password is never included.',
+            self::PasswordReset => 'Fires when an admin revokes an account\'s password. Notice that it happened, not the new password.',
         };
     }
 
@@ -44,6 +50,8 @@ enum AlertEvent: string
             self::DepositToppedUp => '💰',
             self::PaymentReceived => '✅',
             self::DailySummary => '📊',
+            self::UserCreated => '👤',
+            self::PasswordReset => '🔑',
         };
     }
 

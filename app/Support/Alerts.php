@@ -66,6 +66,36 @@ final class Alerts
                 isset($p['reference']) ? 'Reference: <code>'.$e($p['reference']).'</code>' : null,
             ])),
 
+            /*
+             * Neither of these carries the password. The Telegram destination
+             * is a team group whose history is permanent and searchable, and a
+             * credential posted there outlives the account. The temporary
+             * password is shown once in the admin screen instead, for whoever
+             * is going to hand it over.
+             */
+            AlertEvent::UserCreated => implode("\n", array_filter([
+                $event->emoji().' <b>Cabinet account created</b>',
+                '',
+                'Name: <b>'.$e($p['name'] ?? '—').'</b>',
+                'Email: <code>'.$e($p['email'] ?? '—').'</code>',
+                'Cabinet: '.$e($p['cabinet'] ?? '—'),
+                isset($p['organisation']) ? 'Organisation: '.$e($p['organisation']) : null,
+                isset($p['by']) ? 'Created by: '.$e($p['by']) : null,
+                '',
+                '<i>A temporary password was issued and must be changed at first sign-in.</i>',
+            ])),
+
+            AlertEvent::PasswordReset => implode("\n", array_filter([
+                $event->emoji().' <b>Password reset</b>',
+                '',
+                'Account: <b>'.$e($p['name'] ?? '—').'</b>',
+                'Email: <code>'.$e($p['email'] ?? '—').'</code>',
+                'Cabinet: '.$e($p['cabinet'] ?? '—'),
+                isset($p['by']) ? 'Reset by: '.$e($p['by']) : null,
+                '',
+                '<i>Any existing session was ended. If this was not expected, treat the account as compromised.</i>',
+            ])),
+
             AlertEvent::DailySummary => implode("\n", array_filter([
                 $event->emoji().' <b>Daily summary</b> — '.$e($p['date'] ?? ''),
                 '',
