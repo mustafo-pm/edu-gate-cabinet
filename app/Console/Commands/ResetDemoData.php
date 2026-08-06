@@ -12,6 +12,7 @@ use App\Enums\MerchantType;
 use App\Enums\PspStatus;
 use App\Enums\ScheduleStatus;
 use App\Models\ApiKey;
+use App\Models\Bank;
 use App\Models\BankBranch;
 use App\Models\BankTransfer;
 use App\Models\Deposit;
@@ -87,6 +88,16 @@ class ResetDemoData extends Command
         $this->info('Cleared.');
 
         $branch = $this->payableBranch();
+
+        if (! $branch) {
+            return self::FAILURE;
+        }
+
+        $account = $this->settlementAccount($branch);
+
+        if (! $account) {
+            return self::FAILURE;
+        }
 
         $merchant = Merchant::create([
             'name' => 'Toshkent Davlat Universiteti',
@@ -172,6 +183,7 @@ class ResetDemoData extends Command
             ['Students', 'STU-0001, STU-0002, STU-0003'],
             ['PSP', $psp->name.'  (id '.$psp->id.')'],
             ['PSP deposit', number_format($float / 100).' UZS'],
+            ['Sends from', $account->label.'  ·  '.$account->account],
             ['API key_id', $key->key_id],
             ['API secret', $secret],
             ['merchant login', 'merchant@edu-gate.uz'],
@@ -184,37 +196,99 @@ class ResetDemoData extends Command
     }
 
     /**
+     * The account we send FROM. Without one, every posting blocks on
+     * "No active settlement account to send from for this bank" — which is a
+     * correct refusal but makes for a demo that provably cannot complete.
+     *
+     * Only created when none exists, and only ever pointed at the simulator.
+     * These are placeholder requisites for a fake bank; EduGate's real account
+     * details must be entered by a human in Accounting → Our accounts before
+     * anything is sent to a real one.
+     */
+    private function settlementAccount(BankBranch $branch): ?SettlementAccount
+    {
+        $existing = SettlementAccount::where('is_active', true)->first();
+
+        if ($existing) {
+            return $existing;
+        }
+
+        $base = (string) config('services.aloqabank.base_url');
+
+        if (! str_contains($base, '/sim/')) {
+            $this->error('No settlement account exists and the A2A driver points at a REAL bank.');
+            $this->error('Refusing to invent account details. Add one in Accounting → Our accounts.');
+
+            return null;
+        }
+
+        $account = SettlementAccount::create([
+            'bank_id' => $branch->bank_id,
+            'label' => 'DEMO — Aloqabank simulator',
+            // Matches the partner account the simulator seeds for service 33.
+            'account' => '20208000405273320010',
+            'mfo' => $branch->mfo,
+            'tax' => '301234567',
+            'holder_name' => 'EduGate LLC (demo)',
+            'driver' => 'aloqabank',
+            'balance' => 500_000_000_000,
+            'balance_updated_at' => now(),
+            'is_default' => true,
+            'is_active' => true,
+        ]);
+
+        $this->warn('No settlement account existed, so a DEMO one was created against the simulator.');
+        $this->warn('Replace it with EduGate\'s real requisites before pointing the driver at a real bank.');
+
+        return $account;
+    }
+
+    /**
      * A branch money may actually be routed to.
      *
-     * Prefers one a human already confirmed. If none exists it confirms the
-     * branch behind our default settlement account and says so loudly — an
-     * unconfirmed MFO would leave every posting blocked, which makes for a
-     * confusing demo, but silently confirming one is not something to hide.
+     * Order matters, and getting it wrong produces a demo that cannot possibly
+     * work: the branch has to belong to a bank we hold a DRIVER for, because
+     * that is the only rail a posting can leave on. Picking "the first branch
+     * in the table" lands on an arbitrary one of 38 banks and every posting
+     * then blocks for want of a settlement account.
      */
-    private function payableBranch(): BankBranch
+    private function payableBranch(): ?BankBranch
     {
+        $rail = $this->rail();
+
         $confirmed = BankBranch::with('bank')
+            ->where('bank_id', $rail?->id)
             ->where('match_status', BranchMatchStatus::Confirmed)
-            ->first();
+            ->first()
+            // Fall back to any confirmed branch only if our own bank has none.
+            ?? BankBranch::with('bank')->where('match_status', BranchMatchStatus::Confirmed)->first();
 
         if ($confirmed) {
             return $confirmed;
         }
 
-        $account = SettlementAccount::where('is_active', true)->where('is_default', true)->first();
-
         $branch = BankBranch::with('bank')
-            ->when($account, fn ($q) => $q->where('bank_id', $account->bank_id))
+            ->when($rail, fn ($q) => $q->where('bank_id', $rail->id))
             ->first();
 
         if (! $branch) {
-            $this->error('No bank branches at all — import the MFO registry first.');
-            exit(self::FAILURE);
+            $this->error('No branches for a bank we can send from — import the MFO registry first.');
+
+            return null;
         }
 
         $branch->update(['match_status' => BranchMatchStatus::Confirmed]);
         $this->warn("No confirmed branch existed, so MFO {$branch->mfo} was confirmed for this demo.");
 
         return $branch;
+    }
+
+    /** The bank we actually hold an A2A driver for — the only usable rail. */
+    private function rail(): ?Bank
+    {
+        return Bank::where('is_active', true)
+            ->whereNotNull('a2a_driver')
+            ->orderByDesc('a2a_supported')
+            ->first();
     }
 }

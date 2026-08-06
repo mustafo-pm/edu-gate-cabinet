@@ -29,6 +29,22 @@ return [
     |
     */
 
+    /*
+    |--------------------------------------------------------------------------
+    | Drain the queue from the scheduler
+    |--------------------------------------------------------------------------
+    |
+    | Shared cPanel hosting offers no process supervisor, so there is nowhere to
+    | park a long-running `queue:work`. With this on, the per-minute scheduler
+    | cron drains the queue itself. Settlement is queued, so without either a
+    | supervisor or this, payments succeed and no bank transfer is ever created.
+    |
+    | Leave it OFF where Horizon or systemd already runs a worker.
+    |
+    */
+
+    'drain_from_scheduler' => (bool) env('QUEUE_DRAIN_FROM_SCHEDULER', false),
+
     'connections' => [
 
         'sync' => [

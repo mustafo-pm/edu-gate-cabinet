@@ -48,11 +48,12 @@
                 <button type="submit" class="eg-btn eg-btn--primary w-full">{{ __('cabinet.auth.sign_in') }}</button>
             </form>
 
-            {{-- Demo credentials: never rendered in production. --}}
-            @production
-            @else
+            {{-- Seeded logins. Gated on an explicit flag rather than APP_ENV:
+                 the staging cabinet runs as `local` so the bank simulator's routes
+                 register, which would otherwise publish this on a public page. --}}
+            @if (config('demo.show_credentials'))
                 <p class="mt-6 text-center text-xs text-eg-muted">psp@edu-gate.uz · password</p>
-            @endproduction
+            @endif
         </div>
     </div>
 </div>

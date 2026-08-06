@@ -29,3 +29,16 @@ Schedule::command('transfers:poll')
 Schedule::command('transfers:settle-missing')
     ->everyTenMinutes()
     ->withoutOverlapping();
+
+// Shared hosting has no process supervisor — cPanel's Application Manager runs
+// Passenger web apps, not background workers — so the scheduler drains the
+// queue itself. runInBackground keeps a slow job from delaying transfers:poll
+// in the same tick, and max-time bounds each run so ticks cannot pile up.
+// Turn this OFF wherever a real supervisor (Horizon, systemd) runs a worker,
+// or the two will compete for the same jobs.
+if (config('queue.drain_from_scheduler')) {
+    Schedule::command('queue:work', ['--stop-when-empty', '--tries=3', '--max-time=50'])
+        ->everyMinute()
+        ->withoutOverlapping()
+        ->runInBackground();
+}
