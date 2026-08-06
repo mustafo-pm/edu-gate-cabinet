@@ -3,6 +3,8 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Api\ApiIndexController;
+use App\Http\Controllers\Auth\UnifiedLoginController;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -71,4 +73,32 @@ it('returns a JSON pointer rather than documentation at the API root', function 
     expect($response->getData(true))
         ->toHaveKey('status', 'ok')
         ->and($response->getData(true)['data']['base_path'])->toBe('/api/v1');
+});
+
+/**
+ * Regression: the API root was briefly registered unconstrained and LAST, on
+ * the assumption it would sit behind the cabinet's "/". Laravel keys routes by
+ * domain+URI, so it silently REPLACED the login page instead — the cabinet root
+ * started returning JSON.
+ */
+it('still serves the login page at / while no host is pinned', function () {
+    expect(config('domains.cabinet'))->toBeNull()
+        ->and(config('domains.api'))->toBeNull();
+
+    $route = Route::getRoutes()->match(
+        Request::create('http://localhost/', 'GET'),
+    );
+
+    expect($route->getActionName())
+        ->toBe(UnifiedLoginController::class.'@show');
+});
+
+it('does not register the API root until a host is pinned', function () {
+    $roots = collect(Route::getRoutes()->getRoutes())
+        ->filter(fn ($r) => $r->uri() === '/')
+        ->map(fn ($r) => $r->getActionName());
+
+    // One route at "/", and it is the cabinet's.
+    expect($roots)->toHaveCount(1)
+        ->and($roots->first())->not->toContain('ApiIndexController');
 });

@@ -32,12 +32,6 @@ return Application::configure(basePath: dirname(__DIR__))
                 ? Route::middleware($middleware)->domain($domain)
                 : Route::middleware($middleware);
 
-            // The API host must be matched BEFORE the cabinet's "/" login page,
-            // or that route would answer at the root of api.edu-gate.uz.
-            if (filled($api)) {
-                $group($api, 'api')->get('/', ApiIndexController::class);
-            }
-
             // PSP API — api.edu-gate.uz (dev: any host)
             $group($api, 'api')->prefix('api')->group(base_path('routes/api.php'));
 
@@ -62,6 +56,19 @@ return Application::configure(basePath: dirname(__DIR__))
             // Kept on the cabinet host, which is where ALOQABANK_BASE_URL points.
             if (config('simulator.aloqabank.enabled')) {
                 $group($cabinet, 'api')->group(base_path('routes/simulator.php'));
+            }
+
+            // The API root, registered LAST and only once some host is pinned.
+            //
+            // Laravel keys routes by domain+URI, so an UNCONSTRAINED "/" here
+            // would silently overwrite the cabinet's login page rather than sit
+            // behind it. Registering it whenever either host is set keeps the
+            // keys distinct, and means api.edu-gate.uz answers JSON from the
+            // moment its document root is repointed — no window where the API
+            // host is live but serving the wrong thing, and no need to set
+            // API_DOMAIN in the same breath.
+            if (filled($api) || filled($cabinet)) {
+                $group($api, 'api')->get('/', ApiIndexController::class);
             }
         },
     )
