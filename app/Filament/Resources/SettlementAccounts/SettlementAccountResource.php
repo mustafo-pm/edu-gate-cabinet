@@ -20,9 +20,9 @@ class SettlementAccountResource extends Resource
 
     protected static string|BackedEnum|null $navigationIcon = Heroicon::OutlinedWallet;
 
-    protected static string|\UnitEnum|null $navigationGroup = 'Banking';
+    protected static string|\UnitEnum|null $navigationGroup = 'Accounting';
 
-    protected static ?int $navigationSort = 30;
+    protected static ?int $navigationSort = 20;
 
     protected static ?string $navigationLabel = 'Our accounts';
 

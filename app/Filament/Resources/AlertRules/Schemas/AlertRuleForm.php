@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\AlertRules\Schemas;
 
 use App\Enums\AlertEvent;
+use App\Models\TelegramChat;
 use App\Support\Money;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
@@ -31,7 +32,7 @@ class AlertRuleForm
                     Select::make('telegram_chat_id')
                         ->label('Send to')
                         ->relationship('telegramChat', 'chat_id')
-                        ->getOptionLabelFromRecordUsing(fn (\App\Models\TelegramChat $r) => $r->label())
+                        ->getOptionLabelFromRecordUsing(fn (TelegramChat $r) => $r->label())
                         ->searchable()
                         ->preload()
                         ->placeholder('All active destinations')
