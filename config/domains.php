@@ -29,8 +29,10 @@ return [
     // The Filament admin panel; falls back to the cabinet host.
     'admin' => env('ADMIN_DOMAIN', env('CABINET_DOMAIN')),
 
-    // Where partner-facing documentation lives. Only used to point callers at
-    // it from the API root.
-    'docs' => env('DOCS_URL', 'https://docs.edu-gate.uz'),
+    // Where partner-facing documentation lives — a path on the marketing site,
+    // not a subdomain. It rides that site's existing certificate, keeps the
+    // "Developers" nav link internal, and leaves api.edu-gate.uz free to be the
+    // API. Only used to point callers at the docs from the API root.
+    'docs' => env('DOCS_URL', 'https://edu-gate.uz/developers/'),
 
 ];
