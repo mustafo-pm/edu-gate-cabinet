@@ -90,3 +90,41 @@ it('routes the demo institution to a bank we hold a driver for', function () {
     $merchant = Merchant::withoutGlobalScopes()->first();
     expect($merchant->mfo)->toBe('00401');
 });
+
+it('adopts the bank matching a driver key when none is flagged', function () {
+    // Exactly the server's state: the registry is imported but nothing carries
+    // a2a_driver, because that flag is only ever set by the accounting seeder.
+    Bank::query()->update(['a2a_supported' => false, 'a2a_driver' => null]);
+    config(['services.aloqabank.base_url' => 'http://localhost/sim/aloqabank/api/v2']);
+
+    $this->artisan('demo:reset --no-interaction')->assertSuccessful();
+
+    expect(Bank::where('slug', 'aloqabank')->first()->a2a_driver)->toBe('aloqabank');
+});
+
+it('puts our settlement account at the rail bank, not the recipient bank', function () {
+    $other = Bank::create(['code' => '00014', 'slug' => 'budget', 'name_uz' => 'Budget']);
+    BankBranch::create([
+        'bank_id' => $other->id, 'mfo' => '00004', 'name_uz' => 'Budget HQ',
+        'match_status' => BranchMatchStatus::Confirmed, 'is_active' => true,
+    ]);
+    Bank::query()->update(['a2a_supported' => false, 'a2a_driver' => null]);
+    config(['services.aloqabank.base_url' => 'http://localhost/sim/aloqabank/api/v2']);
+
+    $this->artisan('demo:reset --no-interaction')->assertSuccessful();
+
+    $rail = Bank::where('slug', 'aloqabank')->first();
+    $account = SettlementAccount::first();
+
+    // Claiming an Aloqabank integration at Budget bank is how the demo ended up
+    // sending from a bank we hold no relationship with.
+    expect($account->bank_id)->toBe($rail->id)
+        ->and($account->driver)->toBe('aloqabank');
+});
+
+it('fails rather than guessing when no bank matches a driver', function () {
+    Bank::query()->delete();
+    Bank::create(['code' => '00099', 'slug' => 'unknown-bank', 'name_uz' => 'Unknown']);
+
+    $this->artisan('demo:reset --no-interaction')->assertFailed();
+});

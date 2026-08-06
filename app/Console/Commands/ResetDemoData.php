@@ -26,6 +26,7 @@ use App\Models\PspUser;
 use App\Models\SettlementAccount;
 use App\Models\Student;
 use App\Models\Transaction;
+use App\Services\A2a\A2aDriverManager;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
@@ -51,6 +52,11 @@ class ResetDemoData extends Command
         {--password= : Password for the demo logins (default: a random one, printed once)}';
 
     protected $description = 'Delete all tenant/money data and seed one university, three students and one PSP';
+
+    public function __construct(private readonly A2aDriverManager $drivers)
+    {
+        parent::__construct();
+    }
 
     public function handle(): int
     {
@@ -87,13 +93,19 @@ class ResetDemoData extends Command
 
         $this->info('Cleared.');
 
-        $branch = $this->payableBranch();
+        $rail = $this->rail();
+
+        if (! $rail) {
+            return self::FAILURE;
+        }
+
+        $branch = $this->payableBranch($rail);
 
         if (! $branch) {
             return self::FAILURE;
         }
 
-        $account = $this->settlementAccount($branch);
+        $account = $this->settlementAccount($rail);
 
         if (! $account) {
             return self::FAILURE;
@@ -205,7 +217,7 @@ class ResetDemoData extends Command
      * details must be entered by a human in Accounting → Our accounts before
      * anything is sent to a real one.
      */
-    private function settlementAccount(BankBranch $branch): ?SettlementAccount
+    private function settlementAccount(Bank $rail): ?SettlementAccount
     {
         $existing = SettlementAccount::where('is_active', true)->first();
 
@@ -222,15 +234,18 @@ class ResetDemoData extends Command
             return null;
         }
 
+        // Our account lives at the RAIL bank. Creating it at the recipient's
+        // bank instead produced a row claiming an Aloqabank integration at a
+        // bank we have no relationship with.
         $account = SettlementAccount::create([
-            'bank_id' => $branch->bank_id,
-            'label' => 'DEMO — Aloqabank simulator',
+            'bank_id' => $rail->id,
+            'label' => 'DEMO — '.$rail->name_uz.' simulator',
             // Matches the partner account the simulator seeds for service 33.
             'account' => '20208000405273320010',
-            'mfo' => $branch->mfo,
+            'mfo' => BankBranch::where('bank_id', $rail->id)->value('mfo') ?? $rail->code,
             'tax' => '301234567',
             'holder_name' => 'EduGate LLC (demo)',
-            'driver' => 'aloqabank',
+            'driver' => $rail->a2a_driver,
             'balance' => 500_000_000_000,
             'balance_updated_at' => now(),
             'is_default' => true,
@@ -252,12 +267,10 @@ class ResetDemoData extends Command
      * in the table" lands on an arbitrary one of 38 banks and every posting
      * then blocks for want of a settlement account.
      */
-    private function payableBranch(): ?BankBranch
+    private function payableBranch(Bank $rail): ?BankBranch
     {
-        $rail = $this->rail();
-
         $confirmed = BankBranch::with('bank')
-            ->where('bank_id', $rail?->id)
+            ->where('bank_id', $rail->id)
             ->where('match_status', BranchMatchStatus::Confirmed)
             ->first()
             // Fall back to any confirmed branch only if our own bank has none.
@@ -268,7 +281,7 @@ class ResetDemoData extends Command
         }
 
         $branch = BankBranch::with('bank')
-            ->when($rail, fn ($q) => $q->where('bank_id', $rail->id))
+            ->where('bank_id', $rail->id)
             ->first();
 
         if (! $branch) {
@@ -283,12 +296,44 @@ class ResetDemoData extends Command
         return $branch;
     }
 
-    /** The bank we actually hold an A2A driver for — the only usable rail. */
+    /**
+     * The bank we hold an A2A integration with — the only rail a posting can
+     * leave on.
+     *
+     * On a fresh install NO bank carries a2a_driver: the flag is set by the
+     * accounting demo seeder, which a real deploy never runs. Returning null
+     * there made payableBranch() fall through to "the first branch in the
+     * table" and settlementAccount() then created our account at whatever bank
+     * that happened to be — a bank we hold no integration with. So this adopts
+     * the bank matching a registered driver key instead of degrading quietly.
+     */
     private function rail(): ?Bank
     {
-        return Bank::where('is_active', true)
+        $flagged = Bank::where('is_active', true)
             ->whereNotNull('a2a_driver')
             ->orderByDesc('a2a_supported')
             ->first();
+
+        if ($flagged) {
+            return $flagged;
+        }
+
+        foreach ($this->drivers->keys() as $key) {
+            $bank = Bank::where('slug', $key)->first();
+
+            if (! $bank) {
+                continue;
+            }
+
+            $bank->forceFill(['a2a_supported' => true, 'a2a_driver' => $key])->save();
+            $this->warn("No bank was flagged for A2A, so {$bank->name_uz} was enabled with the '{$key}' driver.");
+
+            return $bank;
+        }
+
+        $this->error('No bank matches any registered A2A driver ('.implode(', ', $this->drivers->keys()).').');
+        $this->error('Import the bank registry, or flag the right bank in Banking → Banks.');
+
+        return null;
     }
 }
