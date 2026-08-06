@@ -58,6 +58,9 @@ class AdminPanelProvider extends PanelProvider
                 SubstituteBindings::class,
                 DisableBladeIconComponents::class,
                 DispatchServingFilamentEvent::class,
+                // Filament registers its own routes and offers no domain
+                // option, so the panel is pinned to its host here instead.
+                \App\Http\Middleware\EnforceHost::class.':admin',
             ])
             ->authMiddleware([
                 Authenticate::class,

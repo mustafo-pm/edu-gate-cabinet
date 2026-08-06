@@ -1,49 +1,81 @@
 <?php
 
+use App\Exceptions\PaymentException;
+use App\Http\Controllers\Api\ApiIndexController;
+use App\Http\Middleware\EnforceHost;
+use App\Http\Middleware\SetLocale;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
+use Spatie\Permission\Middleware\PermissionMiddleware;
+use Spatie\Permission\Middleware\RoleMiddleware;
+use Spatie\Permission\Middleware\RoleOrPermissionMiddleware;
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
-        web: __DIR__.'/../routes/web.php',
-        api: __DIR__.'/../routes/api.php',
         commands: __DIR__.'/../routes/console.php',
         health: '/up',
-        apiPrefix: 'api',
         then: function (): void {
+            // Everything is registered here rather than through withRouting's
+            // web:/api: shortcuts, because each group has to be pinnable to its
+            // own hostname. The cabinet and the API are one application; if
+            // api.edu-gate.uz points at the same public/ directory, an
+            // unconstrained group answers there too — including the admin panel.
+            //
+            // Both null in development, where the parts are told apart by path.
+            $api = config('domains.api');
+            $cabinet = config('domains.cabinet');
+
+            $group = fn (?string $domain, string $middleware) => filled($domain)
+                ? Route::middleware($middleware)->domain($domain)
+                : Route::middleware($middleware);
+
+            // The API host must be matched BEFORE the cabinet's "/" login page,
+            // or that route would answer at the root of api.edu-gate.uz.
+            if (filled($api)) {
+                $group($api, 'api')->get('/', ApiIndexController::class);
+            }
+
+            // PSP API — api.edu-gate.uz (dev: any host)
+            $group($api, 'api')->prefix('api')->group(base_path('routes/api.php'));
+
+            // Unified login and shared web routes — cabinet.edu-gate.uz
+            $group($cabinet, 'web')->group(base_path('routes/web.php'));
+
             // Merchant cabinet — app.edu-gate.uz (dev: /merchant/*)
-            Route::middleware('web')
+            $group($cabinet, 'web')
                 ->prefix('merchant')
                 ->name('merchant.')
                 ->group(base_path('routes/merchant.php'));
 
             // PSP / Partner cabinet — partner.edu-gate.uz (dev: /partner/*)
-            Route::middleware('web')
+            $group($cabinet, 'web')
                 ->prefix('partner')
                 ->name('psp.')
                 ->group(base_path('routes/psp.php'));
-            // (admin.edu-gate.uz is served by the Filament panel at /admin)
+            // (the Filament admin panel pins itself with EnforceHost:admin)
 
             // Bank API simulators — stand-ins for a bank we cannot reach yet.
             // Never registered in production; see config/simulator.php.
+            // Kept on the cabinet host, which is where ALOQABANK_BASE_URL points.
             if (config('simulator.aloqabank.enabled')) {
-                Route::middleware('api')->group(base_path('routes/simulator.php'));
+                $group($cabinet, 'api')->group(base_path('routes/simulator.php'));
             }
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
         // Apply the user's chosen locale on every web request.
         $middleware->web(append: [
-            \App\Http\Middleware\SetLocale::class,
+            SetLocale::class,
         ]);
 
         $middleware->alias([
-            'role' => \Spatie\Permission\Middleware\RoleMiddleware::class,
-            'permission' => \Spatie\Permission\Middleware\PermissionMiddleware::class,
-            'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
+            'host' => EnforceHost::class,
+            'role' => RoleMiddleware::class,
+            'permission' => PermissionMiddleware::class,
+            'role_or_permission' => RoleOrPermissionMiddleware::class,
         ]);
 
         // All unauthenticated web users funnel to the single unified login.
@@ -56,7 +88,7 @@ return Application::configure(basePath: dirname(__DIR__))
         );
 
         // Domain payment failures → API error envelope.
-        $exceptions->render(function (\App\Exceptions\PaymentException $e) {
+        $exceptions->render(function (PaymentException $e) {
             return response()->json([
                 'status' => 'error',
                 'error' => ['code' => $e->errorCode, 'message' => $e->getMessage()],
