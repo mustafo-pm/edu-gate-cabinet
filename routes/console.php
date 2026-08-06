@@ -22,3 +22,10 @@ Schedule::command('edugate:daily-summary')
 Schedule::command('transfers:poll')
     ->everyMinute()
     ->withoutOverlapping();
+
+// Backstop for a queue worker that was down when a payment was confirmed: the
+// settlement job would have waited, or been lost with the queue, and nothing
+// else would ever notice the institution had not been paid.
+Schedule::command('transfers:settle-missing')
+    ->everyTenMinutes()
+    ->withoutOverlapping();

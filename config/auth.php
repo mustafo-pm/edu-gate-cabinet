@@ -1,5 +1,9 @@
 <?php
 
+use App\Models\AdminUser;
+use App\Models\MerchantUser;
+use App\Models\Psp;
+use App\Models\PspUser;
 use App\Models\User;
 
 return [
@@ -69,22 +73,22 @@ return [
 
         'merchant_users' => [
             'driver' => 'eloquent',
-            'model' => App\Models\MerchantUser::class,
+            'model' => MerchantUser::class,
         ],
 
         'psp_users' => [
             'driver' => 'eloquent',
-            'model' => App\Models\PspUser::class,
+            'model' => PspUser::class,
         ],
 
         'admin_users' => [
             'driver' => 'eloquent',
-            'model' => App\Models\AdminUser::class,
+            'model' => AdminUser::class,
         ],
 
         'psps' => [
             'driver' => 'eloquent',
-            'model' => App\Models\Psp::class,
+            'model' => Psp::class,
         ],
     ],
 

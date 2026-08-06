@@ -9,6 +9,7 @@ use App\Enums\ScheduleStatus;
 use App\Enums\TransactionStatus;
 use App\Exceptions\PaymentException;
 use App\Jobs\SettlePayment;
+use App\Models\BankTransfer;
 use App\Models\Deposit;
 use App\Models\Merchant;
 use App\Models\PaymentSchedule;
@@ -46,6 +47,12 @@ class ConfirmPayment
             ->first();
 
         if ($existing) {
+            // A replay is also the chance to notice that settlement never
+            // happened for the original — a queue worker that was down when it
+            // was confirmed would otherwise leave the institution unpaid
+            // forever, since the retry returns here and never reaches step 7.
+            $this->ensureSettlement($existing);
+
             return $existing;
         }
 
@@ -122,11 +129,28 @@ class ConfirmPayment
         // bank must not be able to fail or roll any of that back. afterCommit
         // keeps it correct if this action is ever called inside an outer
         // transaction.
-        if (config('settlement.auto')) {
-            SettlePayment::dispatch($transaction->id)->afterCommit();
-        }
+        $this->ensureSettlement($transaction);
 
         return $transaction;
+    }
+
+    /**
+     * Queue settlement unless this payment already has a posting.
+     *
+     * Cheap to call twice: SettleTransaction is idempotent per transaction, and
+     * the existence check keeps a replayed confirm from filling the queue.
+     */
+    private function ensureSettlement(Transaction $transaction): void
+    {
+        if (! config('settlement.auto')) {
+            return;
+        }
+
+        if (BankTransfer::where('transaction_id', $transaction->id)->exists()) {
+            return;
+        }
+
+        SettlePayment::dispatch($transaction->id)->afterCommit();
     }
 
     /** Distribute a paid amount across outstanding schedules, oldest due first. */

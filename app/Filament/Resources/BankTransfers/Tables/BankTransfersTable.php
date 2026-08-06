@@ -2,13 +2,17 @@
 
 namespace App\Filament\Resources\BankTransfers\Tables;
 
+use App\Actions\Payments\SettleTransaction;
 use App\Enums\BankTransferStatus;
 use App\Models\Bank;
 use App\Models\BankTransfer;
 use App\Models\Merchant;
+use App\Services\A2a\A2aDriverManager;
 use App\Support\Money;
+use Filament\Actions\Action;
 use Filament\Actions\ViewAction;
 use Filament\Forms\Components\DatePicker;
+use Filament\Notifications\Notification;
 use Filament\Tables\Columns\Summarizers\Sum;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\Filter;
@@ -138,6 +142,73 @@ class BankTransfersTable
                     ->query(fn (Builder $q) => $q->where('status', BankTransferStatus::Unknown))
                     ->toggle(),
             ])
-            ->recordActions([ViewAction::make()]);
+            ->recordActions([
+                // Blocked or rejected postings can be sent once the cause is
+                // fixed. `unknown` deliberately has no send action — we do not
+                // know whether that money left, and a button that resends it is
+                // how an institution gets paid twice.
+                Action::make('send')
+                    ->label(fn (BankTransfer $r) => $r->status === BankTransferStatus::Failed
+                        ? 'Re-send as new posting' : 'Send to bank')
+                    ->icon('heroicon-o-paper-airplane')
+                    ->visible(fn (BankTransfer $r) => in_array(
+                        $r->status, [BankTransferStatus::Pending, BankTransferStatus::Failed], true,
+                    ))
+                    ->requiresConfirmation()
+                    ->modalDescription(fn (BankTransfer $r) => $r->status === BankTransferStatus::Failed
+                        ? 'The bank already rejected this order id, so a NEW posting is appended and sent. '
+                          .'The original stays for the audit trail.'
+                        : 'This posting has never reached the bank. Routing is re-resolved before sending.')
+                    ->action(function (BankTransfer $record, SettleTransaction $action): void {
+                        $result = $action->retry($record);
+
+                        $ok = $result->status !== BankTransferStatus::Pending;
+
+                        Notification::make()
+                            ->title($ok ? "Sent — {$result->reference} is {$result->status->value}" : 'Still blocked')
+                            ->body($result->error)
+                            ->{$ok ? 'success' : 'warning'}()
+                            ->send();
+                    }),
+
+                // Safe for every non-terminal status, including `unknown`:
+                // asking the bank what happened never moves money.
+                Action::make('recheck')
+                    ->label('Re-check status')
+                    ->icon('heroicon-o-arrow-path')
+                    ->visible(fn (BankTransfer $r) => in_array(
+                        $r->status, [BankTransferStatus::Sent, BankTransferStatus::Unknown], true,
+                    ))
+                    ->action(function (BankTransfer $record, A2aDriverManager $drivers): void {
+                        $driver = $drivers->for($record->driver);
+
+                        if (! $driver) {
+                            Notification::make()->title("No driver [{$record->driver}]")->danger()->send();
+
+                            return;
+                        }
+
+                        $result = $driver->status($record);
+
+                        if ($result->isFinal()) {
+                            $record->forceFill([
+                                'status' => $result->status,
+                                'external_id' => $result->externalId ?? $record->external_id,
+                                'response_payload' => $result->raw,
+                                'error' => $result->message,
+                                'confirmed_at' => $result->status === BankTransferStatus::Confirmed ? now() : null,
+                                'failed_at' => $result->status === BankTransferStatus::Failed ? now() : null,
+                            ])->save();
+                        }
+
+                        Notification::make()
+                            ->title('Bank says: '.$result->status->label())
+                            ->body($result->message)
+                            ->{$result->isFinal() ? 'success' : 'info'}()
+                            ->send();
+                    }),
+
+                ViewAction::make(),
+            ]);
     }
 }

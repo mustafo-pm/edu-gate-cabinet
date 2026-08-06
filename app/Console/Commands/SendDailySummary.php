@@ -7,10 +7,12 @@ namespace App\Console\Commands;
 use App\Enums\AlertEvent;
 use App\Enums\TransactionStatus;
 use App\Models\AlertRule;
+use App\Models\Psp;
 use App\Models\Transaction;
 use App\Support\Alerts;
 use App\Support\Telegram;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
 
 /**
  * Yesterday's totals, pushed to Telegram.
@@ -49,7 +51,7 @@ class SendDailySummary extends Command
         }
 
         $date = $this->option('date')
-            ? \Illuminate\Support\Carbon::parse($this->option('date'))
+            ? Carbon::parse($this->option('date'))
             : now()->subDay();
 
         $rows = Transaction::withoutGlobalScopes()
@@ -69,7 +71,7 @@ class SendDailySummary extends Command
             'volume' => (int) $rows->sum('amount'),
             'commission' => (int) $rows->sum('commission_amount'),
             'net' => (int) $rows->sum('net_amount'),
-            'top_psp' => $topPsp ? \App\Models\Psp::find($topPsp)?->name : null,
+            'top_psp' => $topPsp ? Psp::find($topPsp)?->name : null,
         ];
 
         $sent = Telegram::broadcast(

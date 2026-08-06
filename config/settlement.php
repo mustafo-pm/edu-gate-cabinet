@@ -24,4 +24,14 @@ return [
      */
     'poll_for_hours' => (int) env('SETTLEMENT_POLL_HOURS', 24),
 
+    /*
+     * Payments confirmed BEFORE this moment are never auto-settled.
+     *
+     * Without it, the first deploy of settlement onto a system with history
+     * would have the backstop discover every past payment "missing a posting"
+     * and try to pay them all — money that was very likely already transferred
+     * by hand. Set it to the moment settlement goes live on each environment.
+     */
+    'start_at' => env('SETTLEMENT_START_AT'),
+
 ];

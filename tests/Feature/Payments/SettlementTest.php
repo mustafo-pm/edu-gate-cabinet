@@ -267,3 +267,123 @@ it('refuses to send live money to the simulator', function () {
     expect(fn () => app(AloqabankDriver::class)->send(new BankTransfer(['reference' => 'EG-1'])))
         ->toThrow(RuntimeException::class, 'Refusing to send live transfers');
 });
+
+/**
+ * The gap that made a real payment look like it vanished: the queue worker was
+ * down, so the job waited. A replayed confirm returned early and never
+ * re-dispatched, leaving the institution unpaid with nothing to show for it.
+ */
+it('queues settlement again when a replayed confirm finds no posting', function () {
+    bankSays(['data' => ['payment_status' => 'Введен', 'doc_id' => '1180_5']]);
+
+    Deposit::withoutGlobalScopes()->create([
+        'psp_id' => $this->psp->id, 'type' => LedgerType::Credit,
+        'amount' => 10_000_000, 'balance_after' => 10_000_000, 'reference' => 'TOPUP',
+    ]);
+
+    // First confirm with settlement off — the payment lands, no posting is made.
+    config(['settlement.auto' => false]);
+    $check = app(CheckPayment::class)->handle($this->merchant->id, 'STU-0002', 500_000);
+    $txn = app(ConfirmPayment::class)->handle(
+        pspId: $this->psp->id, checkId: $check['check_id'],
+        partnerTransactionId: 'PT-REPLAY', amountTiyin: 500_000, idempotencyKey: 'k1',
+    );
+    expect(BankTransfer::where('transaction_id', $txn->id)->exists())->toBeFalse();
+
+    // The PSP retries the same partner_transaction_id. Settlement is on now.
+    config(['settlement.auto' => true]);
+    $replay = app(ConfirmPayment::class)->handle(
+        pspId: $this->psp->id, checkId: $check['check_id'],
+        partnerTransactionId: 'PT-REPLAY', amountTiyin: 500_000, idempotencyKey: 'k2',
+    );
+
+    expect($replay->id)->toBe($txn->id)
+        ->and(BankTransfer::where('transaction_id', $txn->id)->count())->toBe(1);
+});
+
+it('does not queue settlement twice when a replay already has a posting', function () {
+    bankSays(['data' => ['payment_status' => 'Введен', 'doc_id' => '1180_6']]);
+    $txn = payment();
+    app(SettleTransaction::class)->handle($txn);
+
+    app(ConfirmPayment::class); // no-op; the guard is exercised below
+    expect(BankTransfer::where('transaction_id', $txn->id)->count())->toBe(1);
+
+    app(SettleTransaction::class)->handle($txn);
+    expect(BankTransfer::where('transaction_id', $txn->id)->count())->toBe(1);
+});
+
+it('backfills payments whose settlement job never ran', function () {
+    bankSays(['data' => ['payment_status' => 'Введен', 'doc_id' => '1180_7']]);
+    $txn = payment();   // completed, but nothing settled it
+
+    expect(BankTransfer::count())->toBe(0);
+
+    $this->artisan('transfers:settle-missing')->assertSuccessful();
+
+    expect(BankTransfer::where('transaction_id', $txn->id)->count())->toBe(1);
+});
+
+it('re-sends a blocked posting once the branch is confirmed', function () {
+    Http::fake();
+    $this->branch->update(['match_status' => BranchMatchStatus::Auto]);
+    $posting = app(SettleTransaction::class)->handle(payment());
+    expect($posting->status)->toBe(BankTransferStatus::Pending);
+
+    // Someone confirms the MFO, then presses "Send to bank".
+    $this->branch->update(['match_status' => BranchMatchStatus::Confirmed]);
+    bankSays(['data' => ['payment_status' => 'Введен', 'doc_id' => '1180_8']]);
+
+    $sent = app(SettleTransaction::class)->retry($posting->fresh());
+
+    expect($sent->id)->toBe($posting->id)          // never sent, so the row is reused
+        ->and($sent->status)->toBe(BankTransferStatus::Sent)
+        ->and($sent->error)->toBeNull();
+});
+
+it('appends a NEW posting when re-sending a rejected one', function () {
+    bankSays(['message' => 'Счёт не найден'], code: 1013, status: 'error');
+    $posting = app(SettleTransaction::class)->handle(payment());
+    expect($posting->status)->toBe(BankTransferStatus::Failed);
+
+    bankSays(['data' => ['payment_status' => 'Введен', 'doc_id' => '1180_9']]);
+    $replacement = app(SettleTransaction::class)->retry($posting->fresh());
+
+    // The bank has spent that order id, so it must not be reused — and the
+    // original stays put, because money rows are append-only.
+    expect($replacement->id)->not->toBe($posting->id)
+        ->and($replacement->reference)->toBe($posting->reference.'-r2')
+        ->and($posting->fresh()->status)->toBe(BankTransferStatus::Failed);
+});
+
+it('refuses to re-send an Unknown posting', function () {
+    Http::fake(fn () => throw new ConnectionException('timed out'));
+    $posting = app(SettleTransaction::class)->handle(payment());
+    expect($posting->status)->toBe(BankTransferStatus::Unknown);
+
+    Http::swap(new Factory);
+    Http::fake();
+
+    // We do not know whether that money left. Re-sending is how it goes twice.
+    $result = app(SettleTransaction::class)->retry($posting->fresh());
+
+    expect($result->status)->toBe(BankTransferStatus::Unknown);
+    Http::assertNothingSent();
+});
+
+/**
+ * Deploying settlement onto a system with history must not try to pay every
+ * past transaction — those were almost certainly transferred by hand already.
+ */
+it('never backfills payments confirmed before settlement went live', function () {
+    Http::fake();
+    $old = payment(['paid_at' => now()->subDays(3)]);
+    $new = payment(['paid_at' => now()]);
+
+    config(['settlement.start_at' => now()->subDay()->toDateTimeString()]);
+
+    $this->artisan('transfers:settle-missing')->assertSuccessful();
+
+    expect(BankTransfer::where('transaction_id', $old->id)->exists())->toBeFalse()
+        ->and(BankTransfer::where('transaction_id', $new->id)->exists())->toBeTrue();
+});

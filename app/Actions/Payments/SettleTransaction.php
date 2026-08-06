@@ -8,6 +8,7 @@ use App\Enums\BankTransferStatus;
 use App\Enums\TransactionStatus;
 use App\Models\BankBranch;
 use App\Models\BankTransfer;
+use App\Models\Merchant;
 use App\Models\SettlementAccount;
 use App\Models\Transaction;
 use App\Services\A2a\A2aDriverManager;
@@ -40,14 +41,18 @@ class SettleTransaction
             return null;
         }
 
-        $reference = $this->reference($transaction);
-
-        // Idempotency: a retried job must not create a second posting.
-        $existing = BankTransfer::where('reference', $reference)->first();
+        // Idempotency: a retried job must not create a second posting. Keyed on
+        // the transaction rather than the reference, so a manual re-send (which
+        // gets a fresh reference) still counts as "already settled".
+        $existing = BankTransfer::where('transaction_id', $transaction->id)
+            ->latest('id')
+            ->first();
 
         if ($existing) {
             return $existing;
         }
+
+        $reference = $this->reference($transaction);
 
         $merchant = $transaction->merchant()->withoutGlobalScopes()->first();
 
@@ -164,8 +169,89 @@ class SettleTransaction
             ?? SettlementAccount::where('is_active', true)->where('is_default', true)->first();
     }
 
+    /**
+     * Re-send a posting that never reached the bank, or that the bank rejected.
+     *
+     * Two different situations, deliberately handled differently:
+     *
+     *  • `pending` — the bank never saw it (blocked on a missing MFO, an
+     *    unconfirmed branch, no driver). Once the blocker is fixed the same row
+     *    can be updated and sent, because the order id is still unused.
+     *
+     *  • `failed` — the bank DID see it and refused. Its order id is now spent;
+     *    reusing it would be rejected as a duplicate. So a new posting is
+     *    appended with a fresh reference, which is also what "append-only,
+     *    corrections are new rows" requires.
+     *
+     * `unknown` is refused outright. We do not know whether that money left,
+     * and re-sending is exactly how an institution gets paid twice — it must be
+     * reconciled against the bank statement instead.
+     */
+    public function retry(BankTransfer $transfer): BankTransfer
+    {
+        if (! in_array($transfer->status, [BankTransferStatus::Pending, BankTransferStatus::Failed], true)) {
+            return $transfer;
+        }
+
+        $merchant = Merchant::withoutGlobalScopes()->find($transfer->merchant_id);
+
+        if (! $merchant) {
+            return $transfer;
+        }
+
+        // Re-resolve routing: the point of a retry is usually that someone has
+        // since fixed the MFO, the account, or the branch's match status.
+        $branch = $merchant->mfo ? BankBranch::where('mfo', $merchant->mfo)->first() : null;
+        $account = $this->settlementAccountFor($branch?->bank_id);
+        $blocker = $this->blocker($merchant, $branch, $account);
+
+        if ($blocker) {
+            $transfer->forceFill(['error' => $blocker])->save();
+
+            return $transfer;
+        }
+
+        $routing = [
+            'settlement_account_id' => $account->id,
+            'bank_branch_id' => $branch->id,
+            'driver' => $account->driver,
+            'recipient_account' => (string) $merchant->bank_account,
+            'recipient_mfo' => (string) $merchant->mfo,
+            'recipient_tax' => $merchant->stir,
+            'recipient_name' => $merchant->name,
+            'error' => null,
+        ];
+
+        if ($transfer->status === BankTransferStatus::Pending) {
+            $transfer->forceFill($routing)->save();
+
+            return $this->dispatchToBank($transfer);
+        }
+
+        $replacement = BankTransfer::create($routing + [
+            'transaction_id' => $transfer->transaction_id,
+            'payout_id' => $transfer->payout_id,
+            'merchant_id' => $transfer->merchant_id,
+            'reference' => $this->nextReference($transfer),
+            'amount' => $transfer->amount,
+            'purpose_code' => $transfer->purpose_code,
+            'purpose_text' => $transfer->purpose_text,
+            'status' => BankTransferStatus::Pending,
+        ]);
+
+        return $this->dispatchToBank($replacement);
+    }
+
     private function reference(Transaction $transaction): string
     {
         return 'EG-'.$transaction->id;
+    }
+
+    /** EG-190 → EG-190-r2 → EG-190-r3: a spent order id is never reused. */
+    private function nextReference(BankTransfer $transfer): string
+    {
+        $attempt = BankTransfer::where('transaction_id', $transfer->transaction_id)->count() + 1;
+
+        return 'EG-'.$transfer->transaction_id.'-r'.$attempt;
     }
 }
