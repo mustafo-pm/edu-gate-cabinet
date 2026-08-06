@@ -1,0 +1,387 @@
+{
+  "info": {
+    "_postman_id": "7c2e5b41-9a08-4d16-b3f7-2e5a91c40022",
+    "name": "Aloqabank API simulator",
+    "description": "Stands in for Aloqabank while we have no access to their sandbox.\n\nThis is NOT EduGate's API — it imitates the BANK, so the cabinet can make real HTTP calls (Basic auth, real client, real timeouts) against something that behaves like them. Only the base URL differs between dev and production.\n\n**Everything is HTTP 200.** The bank reports failure in the body (`status`/`code`), never in the status line. A client that only checks the HTTP code will sail straight past every error.\n\n**Payments settle asynchronously.** `POST /payment` always returns `Введен` — accepted, not paid. Poll `GET /payment/{orderId}` until `Проведен` (settled) or `Удален` (rejected). Treating the create response as \"paid\" is the bug this simulator exists to catch.\n\n**Failure injection is in the last four digits of `receiverAccount`** — like a processor's test card numbers. See the \"Faults\" folder.\n\nAmounts are in tiyin, matching the bank.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "auth": {
+    "type": "basic",
+    "basic": [
+      { "key": "username", "value": "{{username}}", "type": "string" },
+      { "key": "password", "value": "{{password}}", "type": "string" }
+    ]
+  },
+  "variable": [
+    { "key": "base_url", "value": "http://127.0.0.1:8123/sim/aloqabank/api/v2", "type": "string" },
+    { "key": "username", "value": "rpay", "type": "string" },
+    { "key": "password", "value": "p@ssw0rd", "type": "string" },
+    { "key": "serviceId", "value": "33", "type": "string" },
+    { "key": "orderId", "value": "", "type": "string" },
+    { "key": "receiverAccount", "value": "29801000990248844444", "type": "string" }
+  ],
+  "item": [
+    {
+      "name": "1 · Services",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": { "raw": "{{base_url}}/services", "host": ["{{base_url}}"], "path": ["services"] },
+        "description": "Call this first. `id` is the `serviceId` every other method needs, and `type` decides whether refNumber/cardType/cardNumber are mandatory:\n\n- `WORKING_WITH_CARD` — card fields required\n- `CARD_IS_OPTIONAL` — not required"
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const put = (k, v) => (pm.environment.name ? pm.environment : pm.collectionVariables).set(k, v);",
+              "",
+              "pm.test('200 (the bank never uses other status codes)', () => pm.response.to.have.status(200));",
+              "const b = pm.response.json();",
+              "pm.test('success envelope', () => pm.expect(b.status).to.eql('success'));",
+              "if (b.data && b.data.length) {",
+              "    const optional = b.data.find(s => s.type === 'CARD_IS_OPTIONAL') || b.data[0];",
+              "    put('serviceId', String(optional.id));",
+              "    console.log('Using service', optional.id, optional.name, '·', optional.type);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "2 · Create payment (by requisites)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"{{orderId}}\",\n  \"amount\": \"500000\",\n  \"comissionAmount\": \"0\",\n  \"purpose\": \"Tuition payment for STU-0002\",\n  \"serviceId\": \"{{serviceId}}\",\n  \"receiverName\": \"Toshkent Davlat Universiteti\",\n  \"mfoReceiver\": \"00401\",\n  \"receiverAccount\": \"{{receiverAccount}}\",\n  \"innReceiver\": \"123456789\"\n}"
+        },
+        "url": { "raw": "{{base_url}}/payment", "host": ["{{base_url}}"], "path": ["payment"] },
+        "description": "Note `comissionAmount` — the bank spells it with one 's'. Reproduced verbatim; sending the correct spelling is a 1017.\n\n`orderId` must be unique and contain no spaces. The pre-request script mints a fresh one each run.\n\nThe response is always `Введен`. Poll request 4 for the real outcome."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const put = (k, v) => (pm.environment.name ? pm.environment : pm.collectionVariables).set(k, v);",
+              "put('orderId', 'EG-' + Date.now());"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const b = pm.response.json();",
+              "pm.test('accepted', () => pm.expect(b.code).to.eql(0));",
+              "pm.test('accepted is NOT settled', () =>",
+              "    pm.expect(b.data.payment_status).to.eql('Введен'));",
+              "console.log('doc_id', b.data.doc_id, '— now poll for status');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "3 · Create payment (budget)",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"orderId\": \"BUD-{{$timestamp}}\",\n  \"amount\": \"500000\",\n  \"comissionAmount\": \"20000\",\n  \"purpose\": \"За патент за январь 2026 года\",\n  \"purposeCode\": \"09510\",\n  \"innReceiver\": \"207099143\",\n  \"receiverAccount\": \"400522860262837950100251028\",\n  \"serviceId\": \"{{serviceId}}\"\n}"
+        },
+        "url": { "raw": "{{base_url}}/paymentBudget", "host": ["{{base_url}}"], "path": ["paymentBudget"] },
+        "description": "Budget account is 27 digits (not 20), `innReceiver` and `purposeCode` are mandatory, and there is no `receiverName`/`mfoReceiver`.\n\n`doc_id` comes back without the `1180_` prefix that /payment uses."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const b = pm.response.json();",
+              "pm.test('accepted', () => pm.expect(b.code).to.eql(0));",
+              "pm.test('budget doc_id has no prefix', () =>",
+              "    pm.expect(b.data.doc_id).to.not.include('_'));"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "4 · Payment status (poll this)",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": {
+          "raw": "{{base_url}}/payment/{{orderId}}",
+          "host": ["{{base_url}}"],
+          "path": ["payment", "{{orderId}}"]
+        },
+        "description": "Run straight after request 2 and you will see `Введен`. Wait ~10s (the simulator's settle delay) and run again for `Проведен`.\n\nAn unknown orderId returns 1008.\n\n**This is also the correct response to a 1111 or 2222 error** — the bank says do NOT retry those, because the order may already exist. Query here instead."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const b = pm.response.json();",
+              "if (b.code === 0) {",
+              "    const s = b.data.payment_status;",
+              "    pm.test('status is one of the three documented values', () =>",
+              "        pm.expect(['Введен', 'Проведен', 'Удален']).to.include(s));",
+              "    console.log(s === 'Введен' ? 'Still pending — poll again' :",
+              "                s === 'Проведен' ? 'Settled' : 'Rejected by the core banking system');",
+              "} else {",
+              "    console.log('Error', b.code, b.message);",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "5 · Service balance",
+      "request": {
+        "method": "GET",
+        "header": [{ "key": "Accept", "value": "application/json" }],
+        "url": {
+          "raw": "{{base_url}}/account/{{serviceId}}/balance",
+          "host": ["{{base_url}}"],
+          "path": ["account", "{{serviceId}}", "balance"]
+        },
+        "description": "Two documented quirks reproduced here: the envelope has NO `code` field, and `balance` is a STRING while statement amounts are integers. Do not assume a uniform shape across endpoints."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const b = pm.response.json();",
+              "pm.test('balance is a STRING here', () => pm.expect(b.data.balance).to.be.a('string'));",
+              "pm.test('this endpoint omits code', () => pm.expect(b).to.not.have.property('code'));",
+              "console.log('Balance:', (Number(b.data.balance) / 100).toLocaleString(), 'UZS');"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "6 · Statement",
+      "request": {
+        "method": "POST",
+        "header": [
+          { "key": "Content-Type", "value": "application/json" },
+          { "key": "Accept", "value": "application/json" }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"type\": \"0\",\n  \"lastId\": 0,\n  \"fromDate\": \"2026-01-01\",\n  \"toDate\": \"2026-12-31\",\n  \"serviceId\": {{serviceId}}\n}"
+        },
+        "url": { "raw": "{{base_url}}/account/payments", "host": ["{{base_url}}"], "path": ["account", "payments"] },
+        "description": "`type`: 0 all · 1 incoming · 2 outgoing. `lastId` is 0 on the first call, then the highest id you have seen — that is how you page forward."
+      },
+      "response": [],
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const b = pm.response.json();",
+              "pm.test('success', () => pm.expect(b.status).to.eql('success'));",
+              "if (b.data && b.data.length) {",
+              "    pm.test('statement amount is an INT, unlike balance', () =>",
+              "        pm.expect(b.data[0].amount).to.be.a('number'));",
+              "}"
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "Faults · triggered by the last 4 digits of receiverAccount",
+      "description": "Deterministic failure injection. Each request below changes only the account suffix.\n\n| Suffix | Effect |\n|---|---|\n| …0013 | 1013 account not found |\n| …0014 | 1014 receiver bank not an SMP member |\n| …1017 | 1017 missing required fields |\n| …3333 | 3333 document date before the operating day |\n| …1111 | 1111 system error — query status, do NOT retry |\n| …2222 | 2222 critical error — query status, do NOT retry |\n| …1008 | 1008 could not fetch data — retry creation |\n| …9999 | hangs past the client timeout |\n| …8888 | HTTP 200 with a malformed body |\n| …7777 | accepted, then stuck at Введен forever |\n| …6666 | accepted, then rejected to Удален |",
+      "item": [
+        {
+          "name": "1013 — account not found",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"F13-{{$timestamp}}\",\n  \"amount\": \"500000\",\n  \"comissionAmount\": \"0\",\n  \"purpose\": \"Fault test\",\n  \"serviceId\": \"{{serviceId}}\",\n  \"receiverName\": \"Test\",\n  \"mfoReceiver\": \"00401\",\n  \"receiverAccount\": \"29801000990248840013\"\n}" },
+            "url": { "raw": "{{base_url}}/payment", "host": ["{{base_url}}"], "path": ["payment"] }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.test('HTTP is still 200', () => pm.response.to.have.status(200));",
+                "pm.test('code 1013', () => pm.expect(pm.response.json().code).to.eql(1013));"
+              ] }
+            }
+          ]
+        },
+        {
+          "name": "1014 — receiver bank not an SMP member",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"F14-{{$timestamp}}\",\n  \"amount\": \"500000\",\n  \"comissionAmount\": \"0\",\n  \"purpose\": \"Fault test\",\n  \"serviceId\": \"{{serviceId}}\",\n  \"receiverName\": \"Test\",\n  \"mfoReceiver\": \"00401\",\n  \"receiverAccount\": \"29801000990248840014\"\n}" },
+            "url": { "raw": "{{base_url}}/payment", "host": ["{{base_url}}"], "path": ["payment"] },
+            "description": "The failure mode an unconfirmed MFO produces. This is why only `BranchMatchStatus::Confirmed` branches may receive money."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.test('code 1014', () => pm.expect(pm.response.json().code).to.eql(1014));"
+              ] }
+            }
+          ]
+        },
+        {
+          "name": "1111 — system error (query status, do NOT retry)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"F1111-{{$timestamp}}\",\n  \"amount\": \"500000\",\n  \"comissionAmount\": \"0\",\n  \"purpose\": \"Fault test\",\n  \"serviceId\": \"{{serviceId}}\",\n  \"receiverName\": \"Test\",\n  \"mfoReceiver\": \"00401\",\n  \"receiverAccount\": \"29801000990248841111\"\n}" },
+            "url": { "raw": "{{base_url}}/payment", "host": ["{{base_url}}"], "path": ["payment"] },
+            "description": "The bank's docs are explicit: after 1111 or 2222, query /payment/{orderId} rather than resending. The order may already exist on their side — blindly retrying is how an institution gets paid twice."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.test('code 1111', () => pm.expect(pm.response.json().code).to.eql(1111));"
+              ] }
+            }
+          ]
+        },
+        {
+          "name": "8888 — malformed body over HTTP 200",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"F8888-{{$timestamp}}\",\n  \"amount\": \"500000\",\n  \"comissionAmount\": \"0\",\n  \"purpose\": \"Fault test\",\n  \"serviceId\": \"{{serviceId}}\",\n  \"receiverName\": \"Test\",\n  \"mfoReceiver\": \"00401\",\n  \"receiverAccount\": \"29801000990248848888\"\n}" },
+            "url": { "raw": "{{base_url}}/payment", "host": ["{{base_url}}"], "path": ["payment"] },
+            "description": "Truncated JSON with a 200 status. Our client must not crash — it must treat an unparseable body as \"outcome unknown\" and query by orderId."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "pm.test('200 with a body that will not parse', () => {",
+                "    pm.response.to.have.status(200);",
+                "    let ok = true;",
+                "    try { pm.response.json(); } catch (e) { ok = false; }",
+                "    pm.expect(ok, 'body should NOT be valid JSON').to.be.false;",
+                "});"
+              ] }
+            }
+          ]
+        },
+        {
+          "name": "6666 — accepted, then rejected to Удален",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"F6666-{{$timestamp}}\",\n  \"amount\": \"500000\",\n  \"comissionAmount\": \"0\",\n  \"purpose\": \"Fault test\",\n  \"serviceId\": \"{{serviceId}}\",\n  \"receiverName\": \"Test\",\n  \"mfoReceiver\": \"00401\",\n  \"receiverAccount\": \"29801000990248846666\"\n}" },
+            "url": { "raw": "{{base_url}}/payment", "host": ["{{base_url}}"], "path": ["payment"] },
+            "description": "Returns `Введен` like any other payment. Copy the orderId into request 4, wait ~10s, and it becomes `Удален` — late rejection, the case a naive integration marks as paid."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "const put = (k, v) => (pm.environment.name ? pm.environment : pm.collectionVariables).set(k, v);",
+                "const b = pm.response.json();",
+                "pm.test('accepted, looks perfectly normal', () => pm.expect(b.code).to.eql(0));",
+                "put('orderId', JSON.parse(pm.request.body.raw).orderId);",
+                "console.log('Now run request 4 twice — this one ends as Удален');"
+              ] }
+            }
+          ]
+        },
+        {
+          "name": "7777 — accepted, then stuck forever",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"F7777-{{$timestamp}}\",\n  \"amount\": \"500000\",\n  \"comissionAmount\": \"0\",\n  \"purpose\": \"Fault test\",\n  \"serviceId\": \"{{serviceId}}\",\n  \"receiverName\": \"Test\",\n  \"mfoReceiver\": \"00401\",\n  \"receiverAccount\": \"29801000990248847777\"\n}" },
+            "url": { "raw": "{{base_url}}/payment", "host": ["{{base_url}}"], "path": ["payment"] },
+            "description": "Never leaves `Введен`. Polling has to give up after a bounded number of attempts and escalate to a human, rather than loop forever."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": { "type": "text/javascript", "exec": [
+                "const put = (k, v) => (pm.environment.name ? pm.environment : pm.collectionVariables).set(k, v);",
+                "pm.test('accepted', () => pm.expect(pm.response.json().code).to.eql(0));",
+                "put('orderId', JSON.parse(pm.request.body.raw).orderId);"
+              ] }
+            }
+          ]
+        },
+        {
+          "name": "9999 — hangs past the client timeout (SLOW)",
+          "request": {
+            "method": "POST",
+            "header": [
+              { "key": "Content-Type", "value": "application/json" },
+              { "key": "Accept", "value": "application/json" }
+            ],
+            "body": { "mode": "raw", "raw": "{\n  \"orderId\": \"F9999-{{$timestamp}}\",\n  \"amount\": \"500000\",\n  \"comissionAmount\": \"0\",\n  \"purpose\": \"Fault test\",\n  \"serviceId\": \"{{serviceId}}\",\n  \"receiverName\": \"Test\",\n  \"mfoReceiver\": \"00401\",\n  \"receiverAccount\": \"29801000990248849999\"\n}" },
+            "url": { "raw": "{{base_url}}/payment", "host": ["{{base_url}}"], "path": ["payment"] },
+            "description": "Blocks for SIMULATOR_ALOQABANK_TIMEOUT seconds (30 by default), so run it last — `php artisan serve` is single-threaded and everything else waits.\n\nThis is the most dangerous case in the whole integration: the request times out and you do not know whether the money moved. The only safe response is to query by orderId, never to resend."
+          },
+          "response": [],
+          "event": []
+        }
+      ]
+    }
+  ]
+}

@@ -26,6 +26,12 @@ return Application::configure(basePath: dirname(__DIR__))
                 ->name('psp.')
                 ->group(base_path('routes/psp.php'));
             // (admin.edu-gate.uz is served by the Filament panel at /admin)
+
+            // Bank API simulators — stand-ins for a bank we cannot reach yet.
+            // Never registered in production; see config/simulator.php.
+            if (config('simulator.aloqabank.enabled')) {
+                Route::middleware('api')->group(base_path('routes/simulator.php'));
+            }
         },
     )
     ->withMiddleware(function (Middleware $middleware): void {
