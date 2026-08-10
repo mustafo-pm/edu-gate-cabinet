@@ -44,27 +44,43 @@ class ReceiptController extends Controller
             return response()->view('receipt.not-found', [], 404);
         }
 
-        return view('receipt.show', [
-            'receipt' => $receipt,
-            'qr' => Qr::svg($receipt->url()),
-            'checkedAt' => now(),
-        ]);
+        return response()
+            ->view('receipt.show', [
+                'receipt' => $receipt,
+                'qr' => Qr::svg($receipt->url()),
+                'checkedAt' => now(),
+            ])
+            // The page now differs by device language, so any shared cache in
+            // front of us must not hand the Russian copy to an Uzbek visitor.
+            ->header('Vary', 'Accept-Language');
     }
 
     /**
-     * Language for this one request, from ?lang=, defaulting to Uzbek.
+     * Language for this one request: ?lang= if given, otherwise the device's.
+     *
+     * An explicit choice always wins, because the switcher has to work and
+     * because a link shared in one language must open in that language for
+     * whoever receives it. Failing that we read the browser's own preference —
+     * the payer never asked to be here, they scanned a code, so the page should
+     * already be in their language when it loads.
+     *
+     * Falls back to Uzbek when nothing matches, which is also what Symfony
+     * returns for an unknown header since Uzbek heads the offered list.
      *
      * Deliberately not the session locale the cabinet uses: a payer switching
      * this page to Russian must not change the language of a cabinet that
-     * happens to be signed in in the same browser. The link is also shared and
-     * forwarded, so the language has to travel in the URL to survive that.
+     * happens to be signed in in the same browser.
      */
     private function setPageLocale(Request $request): void
     {
         $offered = (array) config('receipt.locales');
         $wanted = (string) $request->query('lang');
 
-        app()->setLocale(in_array($wanted, $offered, true) ? $wanted : $offered[0]);
+        app()->setLocale(
+            in_array($wanted, $offered, true)
+                ? $wanted
+                : ($request->getPreferredLanguage($offered) ?? $offered[0]),
+        );
     }
 
     /**
