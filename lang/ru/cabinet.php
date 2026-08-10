@@ -58,6 +58,7 @@ return [
         'monthly' => 'Месяц',
         'quarterly' => 'Квартал',
         'yearly' => 'Год',
+        'close' => 'Закрыть',
     ],
     'dash' => [
         'active_students' => 'Активные студенты',

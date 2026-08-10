@@ -10,6 +10,7 @@ use App\Models\Concerns\ScopedToPsp;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use OwenIt\Auditing\Auditable;
 use OwenIt\Auditing\Contracts\Auditable as AuditableContract;
 
@@ -60,6 +61,12 @@ class Transaction extends Model implements AuditableContract
     public function schedule(): BelongsTo
     {
         return $this->belongsTo(PaymentSchedule::class, 'payment_schedule_id');
+    }
+
+    /** The public receipt, issued on first request rather than up front. */
+    public function receipt(): HasOne
+    {
+        return $this->hasOne(PaymentReceipt::class);
     }
 
     /**

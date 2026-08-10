@@ -58,6 +58,7 @@ return [
         'monthly' => 'Monthly',
         'quarterly' => 'Quarterly',
         'yearly' => 'Yearly',
+        'close' => 'Close',
     ],
     'dash' => [
         'active_students' => 'Active students',

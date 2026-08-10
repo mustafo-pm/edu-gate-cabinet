@@ -60,6 +60,7 @@ return [
         'monthly' => 'Ay',
         'quarterly' => 'Kvartal',
         'yearly' => 'Jıl',
+        'close' => 'Jabıw',
     ],
     'dash' => [
         'active_students' => 'Belsendi studentler',

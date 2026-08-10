@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Auth\ChangePasswordController;
+use App\Http\Controllers\ReceiptController;
 use App\Http\Controllers\Auth\UnifiedLoginController;
 use App\Http\Controllers\LocaleController;
 use Illuminate\Support\Facades\Route;
@@ -18,3 +19,13 @@ Route::get('locale/{locale}', [LocaleController::class, 'switch'])->name('locale
  */
 Route::get('password/change', [ChangePasswordController::class, 'show'])->name('password.change');
 Route::post('password/change', [ChangePasswordController::class, 'update'])->name('password.change.update');
+
+/*
+ * Public payment receipt — reached by scanning a QR code, no login.
+ *
+ * The code is random rather than the payment id, so the page cannot be walked
+ * from 1 upwards; see PaymentReceipt. Rate limiting lives in the controller
+ * because a wrong code has to be counted differently from a right one.
+ */
+Route::get('chek/{code}', [ReceiptController::class, 'show'])->name('receipt.show');
+Route::get('chek/{code}/pdf', [ReceiptController::class, 'pdf'])->name('receipt.pdf');

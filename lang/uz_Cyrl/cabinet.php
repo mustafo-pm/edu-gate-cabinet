@@ -58,6 +58,7 @@ return [
         'monthly' => 'Ой',
         'quarterly' => 'Чорак',
         'yearly' => 'Йил',
+        'close' => 'Ёпиш',
     ],
     'dash' => [
         'active_students' => 'Фаол талабалар',

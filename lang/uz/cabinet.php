@@ -58,6 +58,7 @@ return [
         'monthly' => 'Oy',
         'quarterly' => 'Chorak',
         'yearly' => 'Yil',
+        'close' => 'Yopish',
     ],
     'dash' => [
         'active_students' => 'Faol talabalar',
