@@ -25,4 +25,21 @@ enum TransactionStatus: string
             self::Refunded => 'refund',
         };
     }
+
+    /**
+     * Phosphor icon name — the project's icon set.
+     *
+     * Returned by the public API because the brand guide forbids conveying a
+     * status by colour alone, and a caller on another host cannot guess which
+     * glyph we mean.
+     */
+    public function icon(): string
+    {
+        return match ($this) {
+            self::Completed => 'check-circle',
+            self::Pending => 'clock',
+            self::Cancelled => 'x-circle',
+            self::Refunded => 'arrow-counter-clockwise',
+        };
+    }
 }

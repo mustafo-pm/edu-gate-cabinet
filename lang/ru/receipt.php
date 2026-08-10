@@ -9,6 +9,7 @@ return [
     'status_refunded' => 'Этот платёж был возвращён.',
     'status_cancelled' => 'Этот платёж отменён.',
     'status_pending' => 'Этот платёж не завершён.',
+    'status' => 'Статус',
     'number' => 'Квитанция №',
     'institution' => 'Учреждение',
     'student' => 'Студент',

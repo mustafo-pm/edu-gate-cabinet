@@ -32,4 +32,17 @@ return [
         'misses_per_hour' => (int) env('RECEIPT_MISSES_PER_HOUR', 10),
     ],
 
+    /*
+     * Languages the public endpoint answers in.
+     *
+     * Every label and status name is returned in all of them at once, so the
+     * page on edu-gate.uz can switch language without asking us again — it is a
+     * static site with no backend to re-query.
+     *
+     * These are the three the website offers. The cabinet also has uz_Cyrl and
+     * kaa translations, so adding either is just another entry here; the cost
+     * is a slightly larger response, nothing more.
+     */
+    'locales' => ['uz', 'ru', 'en'],
+
 ];

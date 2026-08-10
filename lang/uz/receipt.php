@@ -9,6 +9,7 @@ return [
     'status_refunded' => 'Bu to\'lov qaytarilgan.',
     'status_cancelled' => 'Bu to\'lov bekor qilingan.',
     'status_pending' => 'Bu to\'lov yakunlanmagan.',
+    'status' => 'Holat',
     'number' => 'Kvitansiya №',
     'institution' => 'Muassasa',
     'student' => 'Talaba',

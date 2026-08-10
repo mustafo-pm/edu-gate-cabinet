@@ -9,6 +9,7 @@ return [
     'status_refunded' => 'This payment was refunded.',
     'status_cancelled' => 'This payment was cancelled.',
     'status_pending' => 'This payment has not completed.',
+    'status' => 'Status',
     'number' => 'Receipt no.',
     'institution' => 'Institution',
     'student' => 'Student',

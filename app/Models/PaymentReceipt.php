@@ -112,4 +112,28 @@ class PaymentReceipt extends Model
 
         return $base.'/chek/'.$this->code;
     }
+
+    /**
+     * The paying provider's logo, if it may be shown publicly.
+     *
+     * Read from the curated partner wall rather than from the PSP record, and
+     * only when published. Being a PSP is a commercial fact; having your mark
+     * printed on a document a stranger will hold is a decision somebody has to
+     * make, and that decision already lives in `partners`. No published row
+     * means no logo, and the page falls back to the name.
+     */
+    public function pspLogoUrl(): ?string
+    {
+        $pspId = $this->transaction?->psp_id;
+
+        if (! $pspId) {
+            return null;
+        }
+
+        return Partner::published()
+            ->where('source_type', Psp::class)
+            ->where('source_id', $pspId)
+            ->first()
+            ?->logoUrl();
+    }
 }
