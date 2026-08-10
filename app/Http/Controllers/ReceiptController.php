@@ -33,6 +33,8 @@ class ReceiptController extends Controller
             return $limited;
         }
 
+        $this->setPageLocale($request);
+
         $receipt = $this->find($request, $code);
 
         if (! $receipt) {
@@ -50,6 +52,22 @@ class ReceiptController extends Controller
     }
 
     /**
+     * Language for this one request, from ?lang=, defaulting to Uzbek.
+     *
+     * Deliberately not the session locale the cabinet uses: a payer switching
+     * this page to Russian must not change the language of a cabinet that
+     * happens to be signed in in the same browser. The link is also shared and
+     * forwarded, so the language has to travel in the URL to survive that.
+     */
+    private function setPageLocale(Request $request): void
+    {
+        $offered = (array) config('receipt.locales');
+        $wanted = (string) $request->query('lang');
+
+        app()->setLocale(in_array($wanted, $offered, true) ? $wanted : $offered[0]);
+    }
+
+    /**
      * The PDF is built in memory and streamed straight to the browser.
      *
      * Nothing is written to the server: a receipt is personal data, and a
@@ -61,6 +79,8 @@ class ReceiptController extends Controller
         if ($limited = $this->throttle($request)) {
             return $limited;
         }
+
+        $this->setPageLocale($request);
 
         $receipt = $this->find($request, $code);
 

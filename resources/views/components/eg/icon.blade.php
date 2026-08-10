@@ -18,6 +18,13 @@
         'sitemap'  => '<rect x="9" y="3" width="6" height="4.5" rx="1" /><rect x="3" y="16.5" width="6" height="4.5" rx="1" /><rect x="15" y="16.5" width="6" height="4.5" rx="1" /><path d="M12 7.5v4M6 16.5v-2.5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v2.5" />',
         'userplus' => '<path d="M15 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><path d="M19 8v6M22 11h-6" />',
         'megaphone'=> '<path d="M3 11v2a1 1 0 0 0 1 1h2l3.5 4V6L6 10H4a1 1 0 0 0-1 1z" /><path d="M15.5 7.5a5 5 0 0 1 0 9M18.5 4.5a9 9 0 0 1 0 15" />',
+
+        // Transaction statuses. These names match TransactionStatus::icon(), so
+        // the receipt page and the public API show the same glyph.
+        'check-circle' => '<circle cx="12" cy="12" r="9" /><path d="M8.25 12.25l2.5 2.5 5-5.5" />',
+        'x-circle'     => '<circle cx="12" cy="12" r="9" /><path d="M9 9l6 6M15 9l-6 6" />',
+        'clock'        => '<circle cx="12" cy="12" r="9" /><path d="M12 7v5.25l3.25 2" />',
+        'arrow-counter-clockwise' => '<path d="M3.5 12a8.5 8.5 0 1 0 2.9-6.4" /><path d="M3.5 4.5V10H9" />',
     ];
     $d = $paths[$name] ?? $paths['grid'];
 @endphp
