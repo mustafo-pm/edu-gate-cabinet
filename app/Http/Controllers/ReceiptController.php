@@ -6,11 +6,11 @@ namespace App\Http\Controllers;
 
 use App\Models\PaymentReceipt;
 use App\Support\Qr;
+use App\Support\ReceiptLookup;
 use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
-use Illuminate\Support\Facades\RateLimiter;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 /**
@@ -83,46 +83,14 @@ class ReceiptController extends Controller
 
     private function find(Request $request, string $code): ?PaymentReceipt
     {
-        // Cheap shape check first: a wrong-length code never touches the
-        // database, so flooding the endpoint costs an attacker more than us.
-        $valid = preg_match('/^[a-z2-9]{32}$/', $code) === 1;
-
-        $receipt = $valid
-            ? PaymentReceipt::with('transaction')->where('code', $code)->first()
-            : null;
-
-        if (! $receipt) {
-            RateLimiter::hit($this->missKey($request), 3600);
-        }
-
-        return $receipt;
+        return ReceiptLookup::find($request, $code);
     }
 
     /** @return Response|null a response when the caller must be turned away */
     private function throttle(Request $request): ?Response
     {
-        $limits = config('receipt.rate_limit');
-
-        if (RateLimiter::tooManyAttempts($this->missKey($request), $limits['misses_per_hour'])) {
-            return response()->view('receipt.throttled', [], 429);
-        }
-
-        if (RateLimiter::tooManyAttempts($this->lookupKey($request), $limits['lookups_per_minute'])) {
-            return response()->view('receipt.throttled', [], 429);
-        }
-
-        RateLimiter::hit($this->lookupKey($request), 60);
-
-        return null;
-    }
-
-    private function lookupKey(Request $request): string
-    {
-        return 'receipt:look:'.$request->ip();
-    }
-
-    private function missKey(Request $request): string
-    {
-        return 'receipt:miss:'.$request->ip();
+        return ReceiptLookup::throttled($request)
+            ? response()->view('receipt.throttled', [], 429)
+            : null;
     }
 }

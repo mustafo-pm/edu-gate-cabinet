@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\PublicReceiptController;
 use App\Http\Controllers\Api\PublicSiteController;
 use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\CategoryController;
@@ -16,6 +17,13 @@ use Illuminate\Support\Facades\Route;
  */
 Route::prefix('public')->middleware('throttle:120,1')->group(function () {
     Route::get('site', [PublicSiteController::class, 'show'])->name('public.site');
+
+    // Receipt lookup by its random code. The route pattern rejects anything
+    // the wrong shape before the controller runs, so a flood of junk never
+    // reaches the database.
+    Route::get('receipt/{code}', [PublicReceiptController::class, 'show'])
+        ->where('code', '[a-z2-9]{32}')
+        ->name('public.receipt');
 });
 
 /*
