@@ -15,7 +15,7 @@
             <h2 class="text-3xl font-extrabold leading-tight">{{ __('cabinet.auth.institution_cabinet') }}</h2>
             <p class="mt-3 max-w-sm text-white/70">{{ __('cabinet.auth.institution_tagline') }}</p>
         </div>
-        <p class="text-sm text-white/50">app.edu-gate.uz</p>
+        <p class="text-sm text-white/50">{{ \App\Support\Hosts::section('/merchant') }}</p>
     </div>
 
     <div class="relative flex items-center justify-center p-6">

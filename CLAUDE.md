@@ -45,7 +45,13 @@ The platform aggregates payments and settles funds to institutions using a
 payment is deducted from that deposit, and EduGate transfers the net amount to
 the institution's bank account. EduGate earns a commission per transaction.
 
-Public site: **edu-gate.uz** · App: **app.edu-gate.uz** · Partners: **partner.edu-gate.uz** · Admin: **admin.edu-gate.uz** · API: **api.edu-gate.uz**
+Public site: **edu-gate.uz** · API: **api.edu-gate.uz** · All three cabinets:
+**cabinet.edu-gate.uz** (`/merchant`, `/partner`, `/admin`)
+
+> ⚠️ The per-role subdomains below (`app.`, `partner.`, `admin.`) were the
+> original plan and **do not resolve**. Production settled on one cabinet host
+> with path prefixes; only the API got a host of its own. Isolation comes from
+> the four guards, not from four domains.
 
 ---
 

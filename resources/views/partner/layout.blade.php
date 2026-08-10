@@ -41,7 +41,7 @@
         </nav>
         <div class="border-t border-eg-border p-4">
             <p class="text-xs font-medium text-eg-ink">{{ auth('psp')->user()?->psp?->name }}</p>
-            <p class="text-[11px] text-eg-muted">partner.edu-gate.uz</p>
+            <p class="text-[11px] text-eg-muted">{{ \App\Support\Hosts::section('/partner') }}</p>
         </div>
     </aside>
 

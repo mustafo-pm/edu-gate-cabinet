@@ -25,10 +25,14 @@ return [
     |--------------------------------------------------------------------------
     |
     | EduGate uses FOUR separate guards. Sessions are NEVER shared across roles.
-    |   merchant → institution staff  (app.edu-gate.uz)
-    |   psp      → payment providers  (partner.edu-gate.uz)
-    |   admin    → EduGate internal   (admin.edu-gate.uz)
+    |   merchant → institution staff  (cabinet.edu-gate.uz/merchant)
+    |   psp      → payment providers  (cabinet.edu-gate.uz/partner)
+    |   admin    → EduGate internal   (cabinet.edu-gate.uz/admin)
     |   api      → PSP server-to-server via Sanctum token (api.edu-gate.uz)
+    |
+    | The three cabinets share one hostname and are told apart by path; only the
+    | API has a host of its own. Separate guards are what keeps them isolated,
+    | not separate domains, so a shared host changes nothing about the rule.
     |
     */
 

@@ -62,7 +62,7 @@
         </nav>
         <div class="border-t border-eg-border p-4">
             <p class="text-xs font-medium text-eg-ink">{{ auth('merchant')->user()?->merchant?->name }}</p>
-            <p class="text-[11px] text-eg-muted">app.edu-gate.uz</p>
+            <p class="text-[11px] text-eg-muted">{{ \App\Support\Hosts::section('/merchant') }}</p>
         </div>
     </aside>
 

@@ -22,19 +22,22 @@
 
         <div class="mt-10 grid gap-4 sm:grid-cols-3">
             @php
+                // Addresses are derived, not typed: all three cabinets live on
+                // one host behind path prefixes, whatever that host turns out
+                // to be. See App\Support\Hosts.
                 $cabinets = [
-                    [__('cabinet.landing.institution'), __('cabinet.landing.institution_desc'), '/merchant', 'app.edu-gate.uz'],
-                    [__('cabinet.landing.partner'), __('cabinet.landing.partner_desc'), '/partner', 'partner.edu-gate.uz'],
-                    [__('cabinet.landing.admin'), __('cabinet.landing.admin_desc'), '/admin', 'admin.edu-gate.uz'],
+                    [__('cabinet.landing.institution'), __('cabinet.landing.institution_desc'), '/merchant'],
+                    [__('cabinet.landing.partner'), __('cabinet.landing.partner_desc'), '/partner'],
+                    [__('cabinet.landing.admin'), __('cabinet.landing.admin_desc'), '/admin'],
                 ];
             @endphp
-            @foreach ($cabinets as [$name, $desc, $url, $host])
+            @foreach ($cabinets as [$name, $desc, $url])
                 <a href="{{ $url }}"
                    class="group rounded-card bg-white/95 p-5 shadow-eg-lg transition hover:-translate-y-1 hover:bg-white">
                     <p class="text-lg font-bold text-eg-navy">{{ $name }}</p>
                     <p class="mt-1 text-sm text-slate-500">{{ $desc }}</p>
                     <p class="mt-4 text-sm font-semibold text-eg-blue group-hover:underline">{{ __('cabinet.landing.sign_in_arrow') }}</p>
-                    <p class="mt-3 eg-mono text-xs text-slate-400">{{ $host }}</p>
+                    <p class="mt-3 eg-mono text-xs text-slate-400">{{ \App\Support\Hosts::section($url) }}</p>
                 </a>
             @endforeach
         </div>
