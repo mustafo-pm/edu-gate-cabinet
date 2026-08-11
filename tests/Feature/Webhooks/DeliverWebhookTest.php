@@ -157,6 +157,20 @@ it('refuses to call an address that now points inside the network', function () 
         ->and($log->error)->toContain('blocked: private_address');
 });
 
+it('drops a blocked delivery quietly instead of filing a failed job', function () {
+    Http::fake();
+
+    $this->psp->update(['webhook_url' => 'https://rebound.example/hook']);
+
+    // A misconfigured endpoint is the PSP's to fix, not an incident of ours.
+    // Failing the job would write one row per payment into the queue's failure
+    // table until somebody noticed; the delivery log already has it, and that
+    // is the table the PSP can actually see.
+    expect(fn () => deliver($this->psp))->not->toThrow(Throwable::class);
+
+    expect(WebhookDelivery::withoutGlobalScopes()->count())->toBe(1);
+});
+
 it('refuses a bare private address at send time', function () {
     Http::fake();
 

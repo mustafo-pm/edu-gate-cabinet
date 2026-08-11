@@ -57,11 +57,17 @@ class DeliverWebhook implements ShouldQueue
         if ($reason = WebhookUrl::reject($url)) {
             $this->record($psp, $url, null, "blocked: {$reason}", 0, false);
 
-            // No retry: a blocked address will still be blocked in five minutes,
-            // and repeatedly resolving an attacker-controlled name is itself the
-            // behaviour we are trying not to have.
-            $this->fail(new \RuntimeException("Webhook URL rejected: {$reason}"));
-
+            // Recorded and dropped, not retried and not failed.
+            //
+            // No retry, because a blocked address will still be blocked in five
+            // minutes and re-resolving an attacker-controlled name is itself the
+            // behaviour we are avoiding.
+            //
+            // And no failed job either: a misconfigured endpoint is the PSP's to
+            // fix, not an incident of ours, and marking it failed would file one
+            // row per payment into the queue's failure table until somebody
+            // noticed. It is already in webhook_deliveries, which is the table
+            // the PSP can actually see.
             return;
         }
 

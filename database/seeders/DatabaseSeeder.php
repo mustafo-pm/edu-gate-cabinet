@@ -11,8 +11,6 @@ use App\Enums\PspStatus;
 use App\Enums\ScheduleStatus;
 use App\Enums\StudentStatus;
 use App\Enums\TransactionStatus;
-use App\Models\Transaction;
-use Illuminate\Support\Carbon;
 use App\Models\AdminUser;
 use App\Models\ApiKey;
 use App\Models\CommissionRule;
@@ -24,9 +22,11 @@ use App\Models\PaymentSchedule;
 use App\Models\Psp;
 use App\Models\PspUser;
 use App\Models\Student;
+use App\Models\Transaction;
 use App\Notifications\CabinetNotification;
 use App\Support\Money;
 use Illuminate\Database\Seeder;
+use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
 
@@ -122,7 +122,10 @@ class DatabaseSeeder extends Seeder
                 'commission_bps' => 0,
                 'contact_name' => 'Dilshod Nazarov',
                 'contact_email' => 'api@clickpay.uz',
-                'webhook_url' => 'https://clickpay.uz/edugate/webhook',
+                // No webhook_url on purpose. A seeded address that looks real
+                // but is not an endpoint is a trap: the first person to switch
+                // delivery on starts POSTing payment data at somebody's home
+                // page. A PSP sets their own address in the partner cabinet.
             ],
         );
 
