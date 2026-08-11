@@ -29,6 +29,22 @@ return [
     // The Filament admin panel; falls back to the cabinet host.
     'admin' => env('ADMIN_DOMAIN', env('CABINET_DOMAIN')),
 
+    /*
+     * Where a payment receipt is shown to the public.
+     *
+     * The receipt is the one page in the platform a stranger is asked to trust
+     * — a university clerk scanning a QR off a printout — so the link should
+     * carry the brand rather than a host called "cabinet". Setting this
+     * registers /chek/* on that host IN ADDITION to the cabinet, so links
+     * already in circulation keep working.
+     *
+     * The host must actually reach this application: the marketing site is
+     * static, so its document root needs a rewrite forwarding /chek to
+     * public/index.php here. Set RECEIPT_BASE_URL to match, or the QR will
+     * point somewhere the rewrite does not exist.
+     */
+    'receipt' => env('RECEIPT_DOMAIN'),
+
     // Where partner-facing documentation lives — a path on the marketing site,
     // not a subdomain. It rides that site's existing certificate, keeps the
     // "Developers" nav link internal, and leaves api.edu-gate.uz free to be the

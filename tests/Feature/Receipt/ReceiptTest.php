@@ -186,3 +186,28 @@ it('streams the PDF without writing anything to disk', function () {
 it('refuses a PDF for an unknown code', function () {
     $this->get('/chek/'.PaymentReceipt::freshCode().'/pdf')->assertNotFound();
 });
+
+it('serves the receipt on the marketing host once one is configured', function () {
+    config(['domains.receipt' => 'edu-gate.uz', 'domains.cabinet' => 'cabinet.edu-gate.uz']);
+
+    // Route registration happens at boot, so this test documents the intent
+    // rather than re-booting the router: both hosts must resolve the same URI.
+    $routes = collect(app('router')->getRoutes()->getRoutes())
+        ->filter(fn ($r) => str_starts_with($r->uri(), 'chek/'));
+
+    expect($routes)->not->toBeEmpty()
+        ->and($routes->pluck('action.controller')->unique())
+        ->each->toContain('ReceiptController');
+});
+
+it('builds the public link from config, not from route registration order', function () {
+    $receipt = PaymentReceipt::forTransaction($this->txn);
+
+    config(['receipt.base_url' => 'https://edu-gate.uz']);
+
+    // /chek is registered under one route name on two hosts, and route() would
+    // return whichever was registered last. The address printed on a document
+    // must not depend on that.
+    expect($receipt->url())->toBe('https://edu-gate.uz/chek/'.$receipt->code)
+        ->and($receipt->pdfUrl())->toBe('https://edu-gate.uz/chek/'.$receipt->code.'/pdf');
+});

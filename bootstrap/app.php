@@ -40,6 +40,22 @@ return Application::configure(basePath: dirname(__DIR__))
             // Unified login and shared web routes — cabinet.edu-gate.uz
             $group($cabinet, 'web')->group(base_path('routes/web.php'));
 
+            // The public receipt, on the cabinet host and — once set — on the
+            // marketing host too, because that is the address printed on a
+            // document a stranger is asked to trust. Registered on both so
+            // links already in circulation keep working.
+            //
+            // Guarded against registering the same URI twice on the same key:
+            // Laravel keys routes by domain+URI, so a duplicate would silently
+            // overwrite rather than sit beside its twin.
+            $receipt = config('domains.receipt');
+
+            $group($cabinet, 'web')->group(base_path('routes/receipt.php'));
+
+            if (filled($receipt) && $receipt !== $cabinet) {
+                $group($receipt, 'web')->group(base_path('routes/receipt.php'));
+            }
+
             // Merchant cabinet — app.edu-gate.uz (dev: /merchant/*)
             $group($cabinet, 'web')
                 ->prefix('merchant')

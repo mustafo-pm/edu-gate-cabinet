@@ -105,12 +105,24 @@ class PaymentReceipt extends Model
         return $this->status() === TransactionStatus::Completed;
     }
 
-    /** Public URL carried by the QR code. */
+    /**
+     * Public URL carried by the QR code.
+     *
+     * Built from config rather than route(), because /chek is registered on two
+     * hosts under the same route name and route() would silently return
+     * whichever was registered last. The address printed on a document should
+     * not depend on registration order.
+     */
     public function url(): string
     {
         $base = rtrim((string) config('receipt.base_url'), '/');
 
         return $base.'/chek/'.$this->code;
+    }
+
+    public function pdfUrl(): string
+    {
+        return $this->url().'/pdf';
     }
 
     /**

@@ -31,7 +31,7 @@
          forwarded and screenshotted, so the choice has to live in the URL. --}}
     <div class="mb-4 flex items-center justify-center gap-1 text-xs">
         @foreach ($offered as $code)
-            <a href="{{ route('receipt.show', $receipt->code) }}?lang={{ $code }}"
+            <a href="{{ $receipt->url() }}?lang={{ $code }}"
                class="rounded-pill px-2.5 py-1 uppercase tracking-wide
                       {{ $code === $locale ? 'bg-eg-ink font-semibold text-white' : 'text-eg-muted hover:text-eg-ink' }}">
                 {{ $code }}
@@ -130,7 +130,7 @@
     </div>
 
     <div class="mt-4 text-center">
-        <a href="{{ route('receipt.pdf', $receipt->code) }}?lang={{ $locale }}" class="eg-btn eg-btn--ghost">
+        <a href="{{ $receipt->pdfUrl() }}?lang={{ $locale }}" class="eg-btn eg-btn--ghost">
             {{ __('receipt.download_pdf') }}
         </a>
     </div>
