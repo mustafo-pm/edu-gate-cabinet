@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Api\PublicReceiptController;
 use App\Http\Controllers\Api\PublicSiteController;
 use App\Http\Controllers\Api\V1\AuthController;
+use App\Http\Controllers\Api\V1\BalanceController;
 use App\Http\Controllers\Api\V1\CategoryController;
 use App\Http\Controllers\Api\V1\PaymentController;
 use App\Http\Controllers\Api\V1\ReportController;
@@ -38,6 +39,10 @@ Route::prefix('v1')->middleware('throttle:60,1')->group(function () {
     // Authenticated (api guard = Sanctum token → Psp model).
     Route::middleware('auth:sanctum')->group(function () {
         Route::post('auth/logout', [AuthController::class, 'logout']);
+
+        // Prepaid deposit. Every payment is refused once this hits zero, so a
+        // PSP needs to be able to watch it without opening the cabinet.
+        Route::get('balance', [BalanceController::class, 'show']);
 
         Route::get('categories', [CategoryController::class, 'index']);
         Route::get('categories/{category}/institutions', [CategoryController::class, 'institutions']);

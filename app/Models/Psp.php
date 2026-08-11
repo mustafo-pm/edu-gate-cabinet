@@ -22,15 +22,28 @@ class Psp extends Authenticatable implements AuditableContract
 
     protected $fillable = [
         'name', 'code', 'status', 'commission_bps',
-        'contact_name', 'contact_phone', 'contact_email', 'webhook_url',
+        'contact_name', 'contact_phone', 'contact_email',
+        'webhook_url', 'webhook_secret', 'webhook_enabled',
     ];
+
+    /** Never serialised: it is the key that lets someone forge our callbacks. */
+    protected $hidden = ['webhook_secret'];
 
     protected function casts(): array
     {
         return [
             'status' => PspStatus::class,
             'commission_bps' => 'integer',
+            // Encrypted rather than hashed — we have to reproduce it on every
+            // send to sign the body. See the migration for why.
+            'webhook_secret' => 'encrypted',
+            'webhook_enabled' => 'boolean',
         ];
+    }
+
+    public function webhookDeliveries(): HasMany
+    {
+        return $this->hasMany(WebhookDelivery::class);
     }
 
     public function users(): HasMany

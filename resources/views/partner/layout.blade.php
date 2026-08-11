@@ -26,6 +26,7 @@
                     ['psp.deposits', __('cabinet.nav.deposits'), 'wallet'],
                     ['psp.transactions', __('cabinet.nav.transactions'), 'receipt'],
                     ['psp.api-keys', __('cabinet.nav.api_keys'), 'key'],
+                    ['psp.webhooks', __('cabinet.nav.webhooks'), 'send'],
                 ];
             @endphp
             @foreach ($links as [$route, $label, $icon])

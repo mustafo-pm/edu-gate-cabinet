@@ -16,6 +16,7 @@ use App\Models\PaymentSchedule;
 use App\Models\Psp;
 use App\Models\Student;
 use App\Models\Transaction;
+use App\Support\Webhooks;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
@@ -130,6 +131,14 @@ class ConfirmPayment
         // keeps it correct if this action is ever called inside an outer
         // transaction.
         $this->ensureSettlement($transaction);
+
+        // 8. Tell the PSP, if they asked to be told.
+        //
+        // Also queued and after the commit: a webhook cannot be recalled once
+        // the PSP has credited a customer on the strength of it, so a payment
+        // that rolls back must never have announced itself. Failure here is not
+        // the payer's problem — the money has moved either way.
+        Webhooks::paymentCompleted($transaction);
 
         return $transaction;
     }

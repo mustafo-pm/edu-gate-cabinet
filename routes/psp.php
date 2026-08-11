@@ -7,6 +7,7 @@ use App\Livewire\Psp\ApiKeys;
 use App\Livewire\Psp\Dashboard;
 use App\Livewire\Psp\Deposits;
 use App\Livewire\Psp\Transactions;
+use App\Livewire\Psp\WebhookSettings;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -26,4 +27,5 @@ Route::middleware(['auth:psp', 'password.change'])->group(function () {
     Route::get('deposits', Deposits::class)->name('deposits');
     Route::get('transactions', Transactions::class)->name('transactions');
     Route::get('api-keys', ApiKeys::class)->name('api-keys');
+    Route::get('webhooks', WebhookSettings::class)->name('webhooks');
 });
