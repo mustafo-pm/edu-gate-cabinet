@@ -2,6 +2,7 @@
 
 declare(strict_types=1);
 
+use App\Http\Controllers\Api\PublicLegalController;
 use App\Http\Controllers\Api\PublicReceiptController;
 use App\Http\Controllers\Api\PublicSiteController;
 use App\Http\Controllers\Api\V1\AuthController;
@@ -25,6 +26,14 @@ Route::prefix('public')->middleware('throttle:120,1')->group(function () {
     Route::get('receipt/{code}', [PublicReceiptController::class, 'show'])
         ->where('code', '[a-z2-9]{32}')
         ->name('public.receipt');
+
+    // Legal documents, for the marketing site and for PSP apps that show the
+    // offer inside their own flow. The HTML pages at /hujjat/{slug} stay the
+    // canonical, no-JavaScript-required address.
+    Route::get('legal', [PublicLegalController::class, 'index'])->name('public.legal.index');
+    Route::get('legal/{slug}', [PublicLegalController::class, 'show'])
+        ->where('slug', '[a-z0-9-]{2,60}')
+        ->name('public.legal.show');
 });
 
 /*

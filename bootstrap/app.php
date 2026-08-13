@@ -51,9 +51,11 @@ return Application::configure(basePath: dirname(__DIR__))
             $receipt = config('domains.receipt');
 
             $group($cabinet, 'web')->group(base_path('routes/receipt.php'));
+            $group($cabinet, 'web')->group(base_path('routes/legal.php'));
 
             if (filled($receipt) && $receipt !== $cabinet) {
                 $group($receipt, 'web')->group(base_path('routes/receipt.php'));
+                $group($receipt, 'web')->group(base_path('routes/legal.php'));
             }
 
             // Merchant cabinet — app.edu-gate.uz (dev: /merchant/*)

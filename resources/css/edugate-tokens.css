@@ -185,3 +185,27 @@ textarea.eg-input, .eg-input[type="file"] { height: auto; padding: .5rem .75rem;
 .eg-theme-opt .eg-check { visibility: hidden; }
 .eg-theme-opt[aria-current="true"] { color: var(--eg-ink); font-weight: 600; }
 .eg-theme-opt[aria-current="true"] .eg-check { visibility: visible; }
+
+/* ── Rendered markdown ───────────────────────────────────────────────
+   Legal documents are authored as markdown and rendered to bare HTML, so
+   headings and lists arrive without classes. These give them the brand's
+   type scale and rhythm without pulling in a typography plugin. Reading
+   measure matters here more than anywhere else in the product: these are
+   long documents somebody has to get through. */
+.eg-prose { color: var(--eg-text-2); line-height: 1.75; }
+.eg-prose > * + * { margin-top: 1rem; }
+.eg-prose h2 { margin-top: 2.5rem; font-size: 1.375rem; font-weight: 700; color: var(--eg-ink); line-height: 1.3; }
+.eg-prose h3 { margin-top: 2rem; font-size: 1.125rem; font-weight: 600; color: var(--eg-ink); }
+.eg-prose h4 { margin-top: 1.5rem; font-size: 1rem; font-weight: 600; color: var(--eg-ink); }
+.eg-prose ul, .eg-prose ol { padding-left: 1.5rem; }
+.eg-prose ul { list-style: disc; }
+.eg-prose ol { list-style: decimal; }
+.eg-prose li + li { margin-top: .375rem; }
+.eg-prose a { color: var(--eg-blue); text-decoration: underline; text-underline-offset: 2px; }
+.eg-prose strong { color: var(--eg-ink); font-weight: 600; }
+.eg-prose blockquote { border-left: 3px solid var(--eg-border); padding-left: 1rem; color: var(--eg-muted); }
+.eg-prose code { font-family: var(--eg-font-mono); font-size: .875em; background: var(--eg-surface-2); padding: .1em .35em; border-radius: 4px; }
+.eg-prose hr { border: 0; border-top: 1px solid var(--eg-border); margin: 2rem 0; }
+.eg-prose table { width: 100%; border-collapse: collapse; font-size: .9375rem; }
+.eg-prose th, .eg-prose td { border: 1px solid var(--eg-border); padding: .5rem .75rem; text-align: left; }
+.eg-prose th { background: var(--eg-surface-2); font-weight: 600; color: var(--eg-ink); }
