@@ -26,6 +26,16 @@ brief below, agreed with the product owner:
 ⚠️ Shell note: this machine's default `php` was a broken 7.4; use Homebrew PHP 8.5
 (`/opt/homebrew/opt/php/bin`) and Homebrew Composer (`/opt/homebrew/bin/composer`).
 
+⚠️ **On the server, never use bare `php`.** cPanel's PATH `php` is 8.3, the app runs
+on 8.4, and `endroid/qr-code` requires ^8.4 — so `php artisan` fails in ways that do
+not name the real cause. Always spell it out:
+```
+/opt/cpanel/ea-php84/root/usr/bin/php artisan …
+/opt/cpanel/ea-php84/root/usr/bin/php $(which composer) install --no-dev --optimize-autoloader
+```
+Paths: app `/home/edugateu/edu-gate-cabinet` (docroot `public/`, shared by
+cabinet. and api.), marketing site `/home/edugateu/public_html`. Same cPanel account.
+
 Not yet built: HMAC request signing (Bearer + idempotency done), outbound PSP webhooks,
 payout generation UI, uz/ru translation files, roles/permissions seeding.
 
