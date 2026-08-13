@@ -209,3 +209,25 @@ it('opens both admin screens', function () {
         ->get(LegalDocumentVersionResource::getUrl('edit', ['record' => $doc->versions()->first()]))
         ->assertOk();
 });
+
+it('scaffolds the five documents and can be run twice', function () {
+    $this->artisan('edugate:legal-documents')->assertSuccessful();
+
+    expect(LegalDocument::count())->toBe(5)
+        ->and(LegalDocument::pluck('slug')->sort()->values()->all())
+        ->toBe(['hamkor-shartnomasi', 'maxfiylik', 'muassasa-shartnomasi', 'oferta', 'qaytarish-tartibi']);
+
+    // Safe to re-run after a deploy — it must never duplicate a slug that is
+    // already in circulation on printed links.
+    $this->artisan('edugate:legal-documents')->assertSuccessful();
+    expect(LegalDocument::count())->toBe(5);
+});
+
+it('scaffolds documents that are still invisible until text is published', function () {
+    $this->artisan('edugate:legal-documents');
+
+    // Active, but with nothing published — so the page 404s and an admin never
+    // has to hunt for a second switch after publishing.
+    $this->get('/hujjat/oferta')->assertNotFound();
+    $this->getJson('/api/public/legal')->assertOk()->assertJsonPath('data', []);
+});
