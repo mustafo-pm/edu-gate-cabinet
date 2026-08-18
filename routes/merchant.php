@@ -5,6 +5,7 @@ declare(strict_types=1);
 use App\Http\Controllers\Merchant\AuthController;
 use App\Livewire\Merchant\Accounts;
 use App\Livewire\Merchant\Analytics;
+use App\Livewire\Merchant\BankAccounts;
 use App\Livewire\Merchant\Dashboard;
 use App\Livewire\Merchant\Departments;
 use App\Livewire\Merchant\Messaging;
@@ -35,11 +36,14 @@ Route::middleware(['auth:merchant', 'password.change'])->group(function () {
     Route::get('schedules', Schedules::class)->name('schedules');
     Route::get('payments', Payments::class)->name('transactions');
 
+    // The institution's own profile and where it is paid.
+    Route::get('profile', Profile::class)->name('profile');
+    Route::get('bank-accounts', BankAccounts::class)->name('bank-accounts');
+
     // Demo pages (UI only)
     Route::get('analytics', Analytics::class)->name('analytics');
     Route::get('departments', Departments::class)->name('departments');
     Route::get('reports', Reports::class)->name('reports');
     Route::get('messaging', Messaging::class)->name('messaging');
-    Route::get('profile', Profile::class)->name('profile');
     Route::get('accounts', Accounts::class)->name('accounts');
 });

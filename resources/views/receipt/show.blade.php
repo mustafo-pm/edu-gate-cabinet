@@ -69,9 +69,24 @@
         </div>
 
         <dl class="divide-y divide-eg-border/60 px-5 text-sm">
-            <div class="flex items-baseline justify-between gap-4 py-3">
+            <div class="flex items-center justify-between gap-4 py-3">
                 <dt class="shrink-0 text-eg-muted">{{ __('receipt.institution') }}</dt>
-                <dd class="text-right font-medium">{{ $receipt->institution_name }}</dd>
+                <dd class="flex items-center gap-2 text-right font-medium">
+                    {{-- Only when the institution has switched it on: a mark on
+                         a document a stranger holds is somebody's decision. --}}
+                    @if ($logo = $receipt->institutionLogoUrl())
+                        <img src="{{ $logo }}" alt="" class="h-6 w-auto max-w-24 object-contain">
+                    @endif
+                    <span>
+                        {{ $receipt->institution_name }}
+                        @if ($site = $receipt->institutionWebsite())
+                            <a href="{{ $site }}" target="_blank" rel="noopener nofollow"
+                               class="block text-xs font-normal text-eg-blue hover:underline">
+                                {{ preg_replace('#^https?://(www\\.)?#', '', $site) }}
+                            </a>
+                        @endif
+                    </span>
+                </dd>
             </div>
 
             @if ($receipt->student_name)

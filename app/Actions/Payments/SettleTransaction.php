@@ -60,10 +60,15 @@ class SettleTransaction
             return null;
         }
 
-        $branch = $merchant->mfo ? BankBranch::where('mfo', $merchant->mfo)->first() : null;
+        // Where the institution is paid. An approved row wins; the old
+        // single-account columns on `merchants` remain the fallback so a
+        // profile nobody has migrated yet keeps settling.
+        $payee = $this->payeeAccount($merchant);
+
+        $branch = $payee['mfo'] ? BankBranch::where('mfo', $payee['mfo'])->first() : null;
         $account = $this->settlementAccountFor($branch?->bank_id);
 
-        $blocker = $this->blocker($merchant, $branch, $account);
+        $blocker = $this->blocker($merchant, $payee, $branch, $account);
 
         $transfer = DB::transaction(fn () => BankTransfer::create([
             'transaction_id' => $transaction->id,
@@ -73,8 +78,11 @@ class SettleTransaction
             'reference' => $reference,
             // What leaves for the institution is the payment minus our commission.
             'amount' => (int) $transaction->net_amount,
-            'recipient_account' => (string) ($merchant->bank_account ?? ''),
-            'recipient_mfo' => (string) ($merchant->mfo ?? ''),
+            // Snapshotted, not referenced: the institution may retire this
+            // account next term and last term's posting must still say where
+            // the money actually went.
+            'recipient_account' => (string) $payee['account'],
+            'recipient_mfo' => (string) $payee['mfo'],
             'recipient_tax' => $merchant->stir,
             'recipient_name' => $merchant->name,
             'purpose_code' => '00668',
@@ -119,27 +127,49 @@ class SettleTransaction
     }
 
     /**
+     * Which of the institution's accounts this money is going to.
+     *
+     * Prefers an approved row from merchant_bank_accounts; falls back to the
+     * original single-account columns on `merchants` so an institution nobody
+     * has migrated yet still gets paid. A pending or rejected account is never
+     * chosen — that approval step is the only thing standing between a stolen
+     * cabinet password and a redirected term's tuition.
+     *
+     * @return array{account: string, mfo: string}
+     */
+    private function payeeAccount($merchant): array
+    {
+        $primary = $merchant->primaryBankAccount();
+
+        return $primary !== null
+            ? ['account' => (string) $primary->account_number, 'mfo' => (string) $primary->mfo]
+            : ['account' => (string) ($merchant->bank_account ?? ''), 'mfo' => (string) ($merchant->mfo ?? '')];
+    }
+
+    /**
      * Why this posting cannot be sent, or null when it can.
      *
      * Returning a sentence rather than a boolean because it is shown verbatim
      * to whoever has to fix it.
      */
-    private function blocker($merchant, ?BankBranch $branch, ?SettlementAccount $account): ?string
+    private function blocker($merchant, array $payee, ?BankBranch $branch, ?SettlementAccount $account): ?string
     {
-        if (blank($merchant->bank_account)) {
-            return 'Institution has no bank account on file.';
+        if (blank($payee['account'])) {
+            return $merchant->bankAccounts()->exists()
+                ? 'Institution has bank accounts on file but none is approved yet.'
+                : 'Institution has no bank account on file.';
         }
 
-        if (blank($merchant->mfo)) {
+        if (blank($payee['mfo'])) {
             return 'Institution has no MFO on file.';
         }
 
         if (! $branch) {
-            return "MFO {$merchant->mfo} is not in the branch registry.";
+            return "MFO {$payee['mfo']} is not in the branch registry.";
         }
 
         if (! $branch->match_status->isPayable()) {
-            return "Branch MFO {$merchant->mfo} is {$branch->match_status->value}, not confirmed. "
+            return "Branch MFO {$payee['mfo']} is {$branch->match_status->value}, not confirmed. "
                 .'Confirm it in Banking → Branches before money is routed there.';
         }
 
@@ -201,9 +231,10 @@ class SettleTransaction
 
         // Re-resolve routing: the point of a retry is usually that someone has
         // since fixed the MFO, the account, or the branch's match status.
-        $branch = $merchant->mfo ? BankBranch::where('mfo', $merchant->mfo)->first() : null;
+        $payee = $this->payeeAccount($merchant);
+        $branch = $payee['mfo'] ? BankBranch::where('mfo', $payee['mfo'])->first() : null;
         $account = $this->settlementAccountFor($branch?->bank_id);
-        $blocker = $this->blocker($merchant, $branch, $account);
+        $blocker = $this->blocker($merchant, $payee, $branch, $account);
 
         if ($blocker) {
             $transfer->forceFill(['error' => $blocker])->save();
@@ -215,8 +246,8 @@ class SettleTransaction
             'settlement_account_id' => $account->id,
             'bank_branch_id' => $branch->id,
             'driver' => $account->driver,
-            'recipient_account' => (string) $merchant->bank_account,
-            'recipient_mfo' => (string) $merchant->mfo,
+            'recipient_account' => (string) $payee['account'],
+            'recipient_mfo' => (string) $payee['mfo'],
             'recipient_tax' => $merchant->stir,
             'recipient_name' => $merchant->name,
             'error' => null,

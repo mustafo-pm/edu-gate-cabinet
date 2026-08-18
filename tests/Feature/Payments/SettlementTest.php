@@ -8,6 +8,7 @@ use App\Actions\Payments\SettleTransaction;
 use App\Enums\BankTransferStatus;
 use App\Enums\BranchMatchStatus;
 use App\Enums\LedgerType;
+use App\Enums\MerchantBankAccountStatus;
 use App\Enums\MerchantStatus;
 use App\Enums\MerchantType;
 use App\Enums\PspStatus;
@@ -17,6 +18,7 @@ use App\Models\BankBranch;
 use App\Models\BankTransfer;
 use App\Models\Deposit;
 use App\Models\Merchant;
+use App\Models\MerchantBankAccount;
 use App\Models\Psp;
 use App\Models\SettlementAccount;
 use App\Models\Student;
@@ -386,4 +388,78 @@ it('never backfills payments confirmed before settlement went live', function ()
 
     expect(BankTransfer::where('transaction_id', $old->id)->exists())->toBeFalse()
         ->and(BankTransfer::where('transaction_id', $new->id)->exists())->toBeTrue();
+});
+
+/*
+ * Routing moved from a single column on `merchants` to an approved row in
+ * merchant_bank_accounts. These pin down which of the two wins, and what
+ * happens in the gap while an institution is switching banks.
+ */
+
+it('sends to the institution approved bank account, not the legacy column', function () {
+    $ipak = MerchantBankAccount::withoutGlobalScopes()->create([
+        'merchant_id' => $this->merchant->id,
+        'bank_name' => 'Aloqabank', 'mfo' => '00401',
+        'account_number' => '20208000900000000777',
+        'status' => MerchantBankAccountStatus::Active,
+    ]);
+
+    $posting = app(SettleTransaction::class)->handle(payment(), send: false);
+
+    expect($posting->recipient_account)->toBe($ipak->account_number)
+        // The old column is still populated and deliberately not used.
+        ->and($posting->recipient_account)->not->toBe($this->merchant->bank_account);
+});
+
+it('still settles for an institution nobody has migrated yet', function () {
+    // No rows in merchant_bank_accounts at all — the original columns carry it.
+    $posting = app(SettleTransaction::class)->handle(payment(), send: false);
+
+    expect($posting->recipient_account)->toBe($this->merchant->bank_account)
+        ->and($posting->error)->toBeNull();
+});
+
+it('holds the money when an account exists but is not approved', function () {
+    $this->merchant->forceFill(['bank_account' => null, 'mfo' => null])->save();
+
+    MerchantBankAccount::withoutGlobalScopes()->create([
+        'merchant_id' => $this->merchant->id,
+        'bank_name' => 'Aloqabank', 'mfo' => '00401',
+        'account_number' => '20208000900000000777',
+    ]);   // pending
+
+    $posting = app(SettleTransaction::class)->handle(payment(), send: false);
+
+    // Held with a sentence somebody can act on, rather than paid to an
+    // unverified number.
+    expect($posting->status)->toBe(BankTransferStatus::Pending)
+        ->and($posting->error)->toContain('none is approved yet');
+});
+
+it('keeps a past posting pointing at the account that was actually paid', function () {
+    $davr = MerchantBankAccount::withoutGlobalScopes()->create([
+        'merchant_id' => $this->merchant->id,
+        'bank_name' => 'Davr Bank', 'mfo' => '00401',
+        'account_number' => '20208000900000000111',
+        'status' => MerchantBankAccountStatus::Active,
+    ]);
+    $davr->makePrimary();
+
+    $old = app(SettleTransaction::class)->handle(payment(), send: false);
+
+    // The university moves to another bank the following term.
+    $ipak = MerchantBankAccount::withoutGlobalScopes()->create([
+        'merchant_id' => $this->merchant->id,
+        'bank_name' => 'Ipak Yuli', 'mfo' => '00401',
+        'account_number' => '20208000900000000222',
+        'status' => MerchantBankAccountStatus::Active,
+    ]);
+    $ipak->makePrimary();
+    $davr->forceFill(['status' => MerchantBankAccountStatus::Archived])->save();
+
+    // Last term's posting must still say where that money went.
+    expect($old->fresh()->recipient_account)->toBe('20208000900000000111');
+
+    $new = app(SettleTransaction::class)->handle(payment(['partner_transaction_id' => 'PT-NEXT-TERM']), send: false);
+    expect($new->recipient_account)->toBe('20208000900000000222');
 });

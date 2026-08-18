@@ -37,7 +37,8 @@
                         ['merchant.messaging', __('ext.menu.messaging'), 'send'],
                     ],
                     __('ext.sec.university') => [
-                        ['merchant.profile', __('ext.menu.profile'), 'building'],
+                        ['merchant.profile', __('cabinet.profile.title'), 'building'],
+                        ['merchant.bank-accounts', __('cabinet.bank_accounts.title'), 'wallet'],
                         ['merchant.accounts', __('ext.menu.accounts'), 'userplus'],
                     ],
                 ];

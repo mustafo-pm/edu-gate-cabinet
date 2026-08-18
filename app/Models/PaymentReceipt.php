@@ -126,6 +126,29 @@ class PaymentReceipt extends Model
     }
 
     /**
+     * The institution's own mark, when it has agreed to show one.
+     *
+     * Read live from the merchant rather than snapshotted with the rest: a
+     * logo is presentation, not a fact about the payment, and an institution
+     * that rebrands would rather old receipts carried the new mark than the
+     * one it retired.
+     */
+    public function institutionLogoUrl(bool $dark = false): ?string
+    {
+        $merchant = $this->transaction?->merchant;
+
+        return $merchant?->show_on_receipt ? $merchant->logoUrl($dark) : null;
+    }
+
+    /** The institution's website, when it has agreed to publish it. */
+    public function institutionWebsite(): ?string
+    {
+        $merchant = $this->transaction?->merchant;
+
+        return $merchant?->show_on_receipt ? ($merchant->website_url ?: null) : null;
+    }
+
+    /**
      * The paying provider's logo, if it may be shown publicly.
      *
      * Read from the curated partner wall rather than from the PSP record, and
