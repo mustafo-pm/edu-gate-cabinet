@@ -12,6 +12,7 @@ use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -89,7 +90,7 @@ class MerchantBankAccountResource extends Resource
                         'rejected' => 'danger', default => 'gray',
                     }),
 
-                TextColumn::make('is_primary')->label('Settles here')->boolean(),
+                IconColumn::make('is_primary')->label('Settles here')->boolean(),
                 TextColumn::make('approver.name')->label('Approved by')->placeholder('—')->toggleable(),
                 TextColumn::make('created_at')->dateTime('d.m.Y H:i')->toggleable(),
             ])

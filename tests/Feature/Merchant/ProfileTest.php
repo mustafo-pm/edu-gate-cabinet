@@ -8,8 +8,10 @@ use App\Enums\MerchantStatus;
 use App\Enums\MerchantType;
 use App\Enums\PspStatus;
 use App\Enums\TransactionStatus;
+use App\Filament\Resources\MerchantBankAccounts\MerchantBankAccountResource;
 use App\Livewire\Merchant\BankAccounts;
 use App\Livewire\Merchant\Profile;
+use App\Models\AdminUser;
 use App\Models\Merchant;
 use App\Models\MerchantBankAccount;
 use App\Models\MerchantContact;
@@ -237,4 +239,27 @@ it('opens both cabinet pages', function () {
 
     Pest\Laravel\actingAs($user, 'merchant')->get('/merchant/profile')->assertOk();
     Pest\Laravel\actingAs($user, 'merchant')->get('/merchant/bank-accounts')->assertOk();
+});
+
+it('opens the admin approval screen and the panel it lives in', function () {
+    $admin = AdminUser::create([
+        'name' => 'Admin', 'email' => 'admin@edu-gate.uz',
+        'password' => Hash::make('x'), 'is_active' => true, 'password_changed_at' => now(),
+    ]);
+
+    // The dashboard renders every resource's navigation entry, so a resource
+    // that fatals takes the whole panel — including sign-in — down with it.
+    Pest\Laravel\actingAs($admin, 'admin')->get('/admin')->assertOk();
+
+    Pest\Laravel\actingAs($admin, 'admin')
+        ->get(MerchantBankAccountResource::getUrl('index'))
+        ->assertOk();
+});
+
+it('serves the one sign-in page every role uses', function () {
+    // There is no /admin/login: the cabinet has a single unified login that
+    // detects the guard from the email. Worth pinning down, because a broken
+    // panel resource can take this page down with it.
+    $this->get('/admin/login')->assertNotFound();
+    $this->get('/')->assertOk();
 });
