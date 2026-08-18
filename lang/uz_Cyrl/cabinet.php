@@ -29,6 +29,7 @@ return [
         'bad_credentials' => 'Киритилган маълумотлар мос келмади.',
         'inactive' => 'Ҳисоб фаол эмас. Администраторингизга мурожаат қилинг.',
         'change_password' => 'Parolni o\'zgartiring',
+        'account' => 'Ҳисоб',
         'forced_intro' => 'Bu hisob vaqtinchalik paroldan foydalanmoqda. Davom etish uchun yangisini tanlang.',
         'voluntary_intro' => 'Hisobingiz uchun yangi parol tanlang.',
         'current_password' => 'Joriy parol',

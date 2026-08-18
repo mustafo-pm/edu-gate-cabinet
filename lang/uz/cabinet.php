@@ -29,6 +29,7 @@ return [
         'bad_credentials' => "Kiritilgan maʼlumotlar mos kelmadi.",
         'inactive' => "Hisob faol emas. Administratoringizga murojaat qiling.",
         'change_password' => 'Parolni o\'zgartiring',
+        'account' => 'Hisob',
         'forced_intro' => 'Bu hisob vaqtinchalik paroldan foydalanmoqda. Davom etish uchun yangisini tanlang.',
         'voluntary_intro' => 'Hisobingiz uchun yangi parol tanlang.',
         'current_password' => 'Joriy parol',

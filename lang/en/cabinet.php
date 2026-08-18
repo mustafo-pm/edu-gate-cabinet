@@ -29,6 +29,7 @@ return [
         'bad_credentials' => 'These credentials do not match our records.',
         'inactive' => 'This account is inactive. Contact your administrator.',
         'change_password' => 'Change your password',
+        'account' => 'Account',
         'forced_intro' => 'This account is using a temporary password. Choose a new one to continue.',
         'voluntary_intro' => 'Choose a new password for your account.',
         'current_password' => 'Current password',

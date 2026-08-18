@@ -41,6 +41,28 @@
 
             <form method="POST" action="{{ route('password.change.update') }}" class="mt-6 space-y-4">
                 @csrf
+
+                {{-- Which account this is. Two jobs, both real.
+
+                     For the person: all three cabinets share one host and one
+                     sign-in page, so "change your password" on its own does not
+                     say whose.
+
+                     For the browser: a password manager keys saved credentials
+                     on origin + username. With no username field it has to
+                     guess which entry to update, and it picks whichever it last
+                     used on this host — so changing the merchant's password
+                     silently overwrites the saved admin one, and both are then
+                     wrong. Not hypothetical; it happened. --}}
+                <div>
+                    <label class="mb-1.5 block text-sm font-medium" for="username">
+                        {{ __('cabinet.auth.account') }}
+                    </label>
+                    <input id="username" name="username" type="text" value="{{ $email }}"
+                           autocomplete="username" readonly tabindex="-1"
+                           class="eg-input cursor-default bg-eg-surface-2 text-eg-muted">
+                </div>
+
                 <div>
                     <label class="mb-1.5 block text-sm font-medium" for="current_password">
                         {{ __('cabinet.auth.current_password') }}

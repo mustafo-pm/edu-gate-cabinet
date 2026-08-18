@@ -34,6 +34,9 @@ class ChangePasswordController extends Controller
         return view('auth.change-password', [
             'forced' => (bool) ($user->must_change_password ?? false),
             'logoutRoute' => $this->logoutRoute($user),
+            // Shown on the form, and named `username` for the browser's
+            // password manager. See the view for why that matters.
+            'email' => (string) $user->email,
         ]);
     }
 

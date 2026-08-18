@@ -40,12 +40,17 @@
                 @csrf
                 <div>
                     <label class="mb-1.5 block text-sm font-medium" for="email">{{ __('cabinet.auth.email') }}</label>
+                    {{-- autocomplete matters more here than usual: one host
+                         serves three cabinets, so a password manager has to be
+                         told which field is the username or it cannot keep the
+                         accounts apart. --}}
                     <input id="email" name="email" type="email" value="{{ old('email') }}" required autofocus
-                           class="eg-input" placeholder="you@edu-gate.uz">
+                           autocomplete="username" class="eg-input" placeholder="you@edu-gate.uz">
                 </div>
                 <div>
                     <label class="mb-1.5 block text-sm font-medium" for="password">{{ __('cabinet.auth.password') }}</label>
-                    <input id="password" name="password" type="password" required class="eg-input" placeholder="••••••••">
+                    <input id="password" name="password" type="password" required
+                           autocomplete="current-password" class="eg-input" placeholder="••••••••">
                 </div>
                 <label class="flex items-center gap-2 text-sm text-eg-text">
                     <input type="checkbox" name="remember" class="rounded border-eg-border"> {{ __('cabinet.auth.remember_me') }}

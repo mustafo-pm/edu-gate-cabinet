@@ -31,6 +31,7 @@ return [
         'bad_credentials' => 'Kiritilgen maǵlıwmatlar sáykes kelmedi.',
         'inactive' => 'Esap belsendi emes. Administratorıńızǵa múrájat etiń.',
         'change_password' => 'Parolni o\'zgartiring',
+        'account' => 'Esap',
         'forced_intro' => 'Bu hisob vaqtinchalik paroldan foydalanmoqda. Davom etish uchun yangisini tanlang.',
         'voluntary_intro' => 'Hisobingiz uchun yangi parol tanlang.',
         'current_password' => 'Joriy parol',
