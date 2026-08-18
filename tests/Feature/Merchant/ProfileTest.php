@@ -9,6 +9,8 @@ use App\Enums\MerchantType;
 use App\Enums\PspStatus;
 use App\Enums\TransactionStatus;
 use App\Filament\Resources\MerchantBankAccounts\MerchantBankAccountResource;
+use App\Filament\Resources\MerchantBankAccounts\Pages\CreateMerchantBankAccount;
+use App\Filament\Resources\Merchants\MerchantResource;
 use App\Livewire\Merchant\BankAccounts;
 use App\Livewire\Merchant\Profile;
 use App\Models\AdminUser;
@@ -262,4 +264,53 @@ it('serves the one sign-in page every role uses', function () {
     // panel resource can take this page down with it.
     $this->get('/admin/login')->assertNotFound();
     $this->get('/')->assertOk();
+});
+
+it('lets an admin add and manage institution accounts', function () {
+    $admin = AdminUser::create([
+        'name' => 'Admin', 'email' => 'ops@edu-gate.uz',
+        'password' => Hash::make('x'), 'is_active' => true, 'password_changed_at' => now(),
+    ]);
+
+    $user = institution();
+    $resource = MerchantBankAccountResource::class;
+
+    // Every screen an admin can reach from here. A resource that fatals on one
+    // of them is invisible until somebody clicks it — which is how the last one
+    // reached production.
+    Pest\Laravel\actingAs($admin, 'admin')->get($resource::getUrl('index'))->assertOk();
+    Pest\Laravel\actingAs($admin, 'admin')->get($resource::getUrl('create'))->assertOk();
+    Pest\Laravel\actingAs($admin, 'admin')
+        ->get(MerchantResource::getUrl('index'))->assertOk();
+    Pest\Laravel\actingAs($admin, 'admin')
+        ->get(MerchantResource::getUrl('edit', ['record' => $user->merchant]))
+        ->assertOk();
+
+    $account = MerchantBankAccount::withoutGlobalScopes()->create([
+        'merchant_id' => $user->merchant_id, 'bank_name' => 'Ipak Yuli',
+        'mfo' => '00873', 'account_number' => '20208000900000000222',
+    ]);
+
+    Pest\Laravel\actingAs($admin, 'admin')
+        ->get($resource::getUrl('edit', ['record' => $account]))->assertOk();
+});
+
+it('approves an account an admin typed off the contract', function () {
+    $admin = AdminUser::create([
+        'name' => 'Admin', 'email' => 'ops@edu-gate.uz',
+        'password' => Hash::make('x'), 'is_active' => true, 'password_changed_at' => now(),
+    ]);
+
+    $user = institution();
+
+    $data = (new CreateMerchantBankAccount)
+        ->mutateFormDataBeforeCreateForTesting([
+            'merchant_id' => $user->merchant_id, 'bank_name' => 'Ipak Yuli',
+            'mfo' => '00873', 'account_number' => '20208000900000000222',
+        ]);
+
+    // Asking an admin to approve their own entry would be a click that checks
+    // nothing — typing it off the contract IS the check.
+    expect($data['status'])->toBe(MerchantBankAccountStatus::Active->value)
+        ->and($data['approved_at'])->not->toBeNull();
 });

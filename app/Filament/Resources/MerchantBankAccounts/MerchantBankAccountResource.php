@@ -3,10 +3,15 @@
 namespace App\Filament\Resources\MerchantBankAccounts;
 
 use App\Enums\MerchantBankAccountStatus;
+use App\Filament\Resources\MerchantBankAccounts\Pages\CreateMerchantBankAccount;
+use App\Filament\Resources\MerchantBankAccounts\Pages\EditMerchantBankAccount;
 use App\Filament\Resources\MerchantBankAccounts\Pages\ListMerchantBankAccounts;
+use App\Models\Merchant;
 use App\Models\MerchantBankAccount;
 use BackedEnum;
 use Filament\Actions\Action;
+use Filament\Actions\EditAction;
+use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Notifications\Notification;
 use Filament\Resources\Resource;
@@ -62,10 +67,35 @@ class MerchantBankAccountResource extends Resource
 
     public static function form(Schema $schema): Schema
     {
+        // Fixed once created: an account is added and retired, never rewritten.
+        // Editing these in place would move money without leaving a trace of
+        // what it used to be, which is the thing this table exists to prevent.
+        $locked = fn (?MerchantBankAccount $record) => $record !== null;
+
         return $schema->components([
-            TextInput::make('bank_name')->disabled(),
-            TextInput::make('mfo')->disabled(),
-            TextInput::make('account_number')->disabled(),
+            Select::make('merchant_id')
+                ->label('Institution')
+                ->options(fn () => Merchant::orderBy('name')->pluck('name', 'id'))
+                ->searchable()
+                ->required()
+                ->disabled($locked),
+
+            TextInput::make('bank_name')->required()->disabled($locked),
+
+            TextInput::make('mfo')
+                ->required()
+                ->rule('regex:/^\\d{5}$/')
+                ->helperText('Five digits, e.g. 00401.')
+                ->disabled($locked),
+
+            TextInput::make('account_number')
+                ->required()
+                ->rule('regex:/^\\d{20}$/')
+                ->helperText('Twenty digits. Check it against the contract before saving.')
+                ->disabled($locked),
+
+            TextInput::make('label')
+                ->helperText('Optional, e.g. "tuition". Visible to the institution.'),
         ]);
     }
 
@@ -95,9 +125,15 @@ class MerchantBankAccountResource extends Resource
                 TextColumn::make('created_at')->dateTime('d.m.Y H:i')->toggleable(),
             ])
             ->filters([
+                SelectFilter::make('merchant_id')
+                    ->label('Institution')
+                    ->relationship('merchant', 'name')
+                    ->searchable(),
                 SelectFilter::make('status')->options(MerchantBankAccountStatus::options()),
             ])
             ->recordActions([
+                EditAction::make(),
+
                 Action::make('approve')
                     ->icon('heroicon-o-check-badge')
                     ->color('success')
@@ -141,6 +177,10 @@ class MerchantBankAccountResource extends Resource
 
     public static function getPages(): array
     {
-        return ['index' => ListMerchantBankAccounts::route('/')];
+        return [
+            'index' => ListMerchantBankAccounts::route('/'),
+            'create' => CreateMerchantBankAccount::route('/create'),
+            'edit' => EditMerchantBankAccount::route('/{record}/edit'),
+        ];
     }
 }

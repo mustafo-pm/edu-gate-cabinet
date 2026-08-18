@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\Merchants\Tables;
 
+use App\Filament\Resources\MerchantBankAccounts\MerchantBankAccountResource;
+use Filament\Actions\Action;
 use Filament\Actions\BulkActionGroup;
 use Filament\Actions\DeleteBulkAction;
 use Filament\Actions\EditAction;
@@ -53,6 +55,15 @@ class MerchantsTable
             ])
             ->recordActions([
                 EditAction::make(),
+
+                // Where this institution is paid. Its own screen rather than a
+                // field on the form: several accounts, and an approval step.
+                Action::make('accounts')
+                    ->label('Accounts')
+                    ->icon('heroicon-o-banknotes')
+                    ->url(fn ($record) => MerchantBankAccountResource::getUrl('index', [
+                        'tableFilters[merchant_id][value]' => $record->id,
+                    ])),
             ])
             ->toolbarActions([
                 BulkActionGroup::make([
