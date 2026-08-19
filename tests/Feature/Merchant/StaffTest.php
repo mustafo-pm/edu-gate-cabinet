@@ -2,10 +2,16 @@
 
 declare(strict_types=1);
 
+use App\Enums\MerchantStatus;
+use App\Enums\MerchantType;
+use App\Filament\Resources\MerchantUsers\Pages\CreateMerchantUser;
 use App\Livewire\Merchant\Staff;
+use App\Models\AdminUser;
+use App\Models\Merchant;
 use App\Models\MerchantUser;
 use App\Support\CabinetRoles;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
 
 use function Pest\Laravel\actingAs;
@@ -177,4 +183,32 @@ it('hides links the signed-in user cannot follow', function () {
         ->assertOk()
         ->assertDontSee(__('cabinet.bank_accounts.title'))
         ->assertDontSee(__('cabinet.staff.title'));
+});
+
+it('gives an admin-created cabinet account a role it can use', function () {
+    CabinetRoles::sync();
+
+    $admin = AdminUser::create([
+        'name' => 'Admin', 'email' => 'ops@edu-gate.uz',
+        'password' => Hash::make('x'),
+        'is_active' => true, 'password_changed_at' => now(),
+    ]);
+
+    $merchant = Merchant::create([
+        'name' => 'New University', 'type' => MerchantType::University,
+        'status' => MerchantStatus::Active,
+    ]);
+
+    actingAs($admin, 'admin');
+
+    $user = MerchantUser::create([
+        'merchant_id' => $merchant->id, 'name' => 'First Officer',
+        'email' => 'first@new.uz', 'password' => 'x', 'is_active' => true,
+    ]);
+
+    (new CreateMerchantUser)
+        ->assignDefaultRoleForTesting($user);
+
+    // Onboarding hands over one account; it has to be able to add the others.
+    expect($user->fresh()->hasRole(CabinetRoles::OWNER))->toBeTrue();
 });
