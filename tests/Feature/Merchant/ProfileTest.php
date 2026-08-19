@@ -4,8 +4,6 @@ declare(strict_types=1);
 
 use App\Enums\MerchantBankAccountStatus;
 use App\Enums\MerchantContactKind;
-use App\Enums\MerchantStatus;
-use App\Enums\MerchantType;
 use App\Enums\PspStatus;
 use App\Enums\TransactionStatus;
 use App\Filament\Resources\MerchantBankAccounts\MerchantBankAccountResource;
@@ -14,10 +12,8 @@ use App\Filament\Resources\Merchants\MerchantResource;
 use App\Livewire\Merchant\BankAccounts;
 use App\Livewire\Merchant\Profile;
 use App\Models\AdminUser;
-use App\Models\Merchant;
 use App\Models\MerchantBankAccount;
 use App\Models\MerchantContact;
-use App\Models\MerchantUser;
 use App\Models\PaymentReceipt;
 use App\Models\Psp;
 use App\Models\Student;
@@ -33,19 +29,6 @@ use Livewire\Livewire;
  * institution's to change freely, a bank account decides where money lands and
  * is not.
  */
-function institution(string $name = 'Webster University', string $email = 'finance@webster.uz'): MerchantUser
-{
-    $merchant = Merchant::create([
-        'name' => $name, 'type' => MerchantType::University, 'status' => MerchantStatus::Active,
-    ]);
-
-    return MerchantUser::create([
-        'merchant_id' => $merchant->id, 'name' => 'Finance Officer', 'email' => $email,
-        'password' => Hash::make('secret-password'), 'is_active' => true,
-        'password_changed_at' => now(),
-    ]);
-}
-
 it('saves names in three languages', function () {
     $user = institution();
 

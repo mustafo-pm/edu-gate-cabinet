@@ -42,7 +42,8 @@
             "Tests\\": "tests/"
         },
         "files": [
-            "tests/ApiWorld.php"
+            "tests/ApiWorld.php",
+            "tests/CabinetWorld.php"
         ]
     },
     "scripts": {

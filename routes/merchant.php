@@ -3,7 +3,6 @@
 declare(strict_types=1);
 
 use App\Http\Controllers\Merchant\AuthController;
-use App\Livewire\Merchant\Accounts;
 use App\Livewire\Merchant\Analytics;
 use App\Livewire\Merchant\BankAccounts;
 use App\Livewire\Merchant\Dashboard;
@@ -13,7 +12,9 @@ use App\Livewire\Merchant\Payments;
 use App\Livewire\Merchant\Profile;
 use App\Livewire\Merchant\Reports;
 use App\Livewire\Merchant\Schedules;
+use App\Livewire\Merchant\Staff;
 use App\Livewire\Merchant\Students;
+use App\Support\CabinetRoles;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -31,19 +32,40 @@ Route::middleware('guest:merchant')->group(function () {
 Route::middleware(['auth:merchant', 'password.change'])->group(function () {
     Route::post('logout', [AuthController::class, 'logout'])->name('logout');
 
+    // The dashboard is the one page everybody keeps: an account with a role
+    // but no matching screen would land on a 403 immediately after signing in.
     Route::get('/', Dashboard::class)->name('dashboard');
-    Route::get('students', Students::class)->name('students');
-    Route::get('schedules', Schedules::class)->name('schedules');
-    Route::get('payments', Payments::class)->name('transactions');
+
+    /*
+     * Gated on permissions, not on roles. A role is a bundle somebody may
+     * retune; the screens care about the capability itself.
+     *
+     * Note these are only meaningful once `edugate:roles` has run — before
+     * that nobody holds anything and every one of these 403s.
+     */
+    Route::get('students', Students::class)->name('students')
+        ->middleware('can:'.CabinetRoles::STUDENTS_VIEW);
+    Route::get('schedules', Schedules::class)->name('schedules')
+        ->middleware('can:'.CabinetRoles::SCHEDULES);
+    Route::get('payments', Payments::class)->name('transactions')
+        ->middleware('can:'.CabinetRoles::PAYMENTS_VIEW);
 
     // The institution's own profile and where it is paid.
-    Route::get('profile', Profile::class)->name('profile');
-    Route::get('bank-accounts', BankAccounts::class)->name('bank-accounts');
+    Route::get('profile', Profile::class)->name('profile')
+        ->middleware('can:'.CabinetRoles::PROFILE);
+
+    // Where money lands. The narrowest permission in the cabinet, held by the
+    // owner alone unless somebody deliberately widens it.
+    Route::get('bank-accounts', BankAccounts::class)->name('bank-accounts')
+        ->middleware('can:'.CabinetRoles::BANK_ACCOUNTS);
+
+    Route::get('accounts', Staff::class)->name('accounts')
+        ->middleware('can:'.CabinetRoles::STAFF);
 
     // Demo pages (UI only)
     Route::get('analytics', Analytics::class)->name('analytics');
     Route::get('departments', Departments::class)->name('departments');
-    Route::get('reports', Reports::class)->name('reports');
+    Route::get('reports', Reports::class)->name('reports')
+        ->middleware('can:'.CabinetRoles::REPORTS);
     Route::get('messaging', Messaging::class)->name('messaging');
-    Route::get('accounts', Accounts::class)->name('accounts');
 });

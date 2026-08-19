@@ -13,6 +13,7 @@ use App\Models\PaymentReceipt;
 use App\Models\Psp;
 use App\Models\Student;
 use App\Models\Transaction;
+use App\Support\CabinetRoles;
 use Illuminate\Database\Eloquent\ModelNotFoundException;
 use Illuminate\Support\Facades\Hash;
 use Livewire\Livewire;
@@ -37,6 +38,10 @@ function makePayment(string $institution, string $email): array
         'email' => $email, 'password' => Hash::make('secret-password'),
         'is_active' => true, 'password_changed_at' => now(),
     ]);
+
+    // The payments screen is gated on a permission now.
+    CabinetRoles::sync();
+    $user->assignRole(CabinetRoles::ACCOUNTANT);
 
     $psp = Psp::create([
         'name' => 'ClickPay '.$merchant->id, 'code' => 'clickpay'.$merchant->id,

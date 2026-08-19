@@ -19,35 +19,48 @@
         </div>
         <nav class="flex-1 space-y-5 overflow-y-auto px-3 py-5">
             @php
+                use App\Support\CabinetRoles;
+
+                // Fourth element is the permission the link needs. A link the
+                // user cannot follow is worse than a missing one: they click it
+                // and get a 403 with no explanation of why.
                 $sections = [
                     __('ext.sec.statistics') => [
                         ['merchant.dashboard', __('cabinet.nav.dashboard'), 'grid'],
                         ['merchant.analytics', __('ext.menu.analytics'), 'chart'],
                     ],
                     __('ext.sec.student_affairs') => [
-                        ['merchant.students', __('cabinet.nav.students'), 'users'],
+                        ['merchant.students', __('cabinet.nav.students'), 'users', CabinetRoles::STUDENTS_VIEW],
                         ['merchant.departments', __('ext.menu.departments'), 'sitemap'],
                     ],
                     __('ext.sec.accounting') => [
-                        ['merchant.schedules', __('cabinet.nav.schedules'), 'calendar'],
-                        ['merchant.transactions', __('cabinet.nav.payments'), 'card'],
-                        ['merchant.reports', __('ext.menu.reports'), 'document'],
+                        ['merchant.schedules', __('cabinet.nav.schedules'), 'calendar', CabinetRoles::SCHEDULES],
+                        ['merchant.transactions', __('cabinet.nav.payments'), 'card', CabinetRoles::PAYMENTS_VIEW],
+                        ['merchant.reports', __('ext.menu.reports'), 'document', CabinetRoles::REPORTS],
                     ],
                     __('ext.sec.communications') => [
                         ['merchant.messaging', __('ext.menu.messaging'), 'send'],
                     ],
                     __('ext.sec.university') => [
-                        ['merchant.profile', __('cabinet.profile.title'), 'building'],
-                        ['merchant.bank-accounts', __('cabinet.bank_accounts.title'), 'wallet'],
-                        ['merchant.accounts', __('ext.menu.accounts'), 'userplus'],
+                        ['merchant.profile', __('cabinet.profile.title'), 'building', CabinetRoles::PROFILE],
+                        ['merchant.bank-accounts', __('cabinet.bank_accounts.title'), 'wallet', CabinetRoles::BANK_ACCOUNTS],
+                        ['merchant.accounts', __('cabinet.staff.title'), 'userplus', CabinetRoles::STAFF],
                     ],
                 ];
             @endphp
             @foreach ($sections as $section => $links)
+                @php
+                    $links = array_values(array_filter(
+                        $links,
+                        fn ($l) => ! isset($l[3]) || auth('merchant')->user()?->can($l[3]),
+                    ));
+                @endphp
+                @continue(! $links)
                 <div>
                     <p class="px-3 pb-1.5 text-[11px] font-semibold uppercase tracking-wider text-eg-muted">{{ $section }}</p>
                     <div class="space-y-0.5">
-                        @foreach ($links as [$route, $label, $icon])
+                        @foreach ($links as $link)
+                            @php([$route, $label, $icon] = [$link[0], $link[1], $link[2]])
                             <a href="{{ route($route) }}" wire:navigate
                                class="group flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium transition-colors
                                       {{ request()->routeIs($route)
