@@ -31,7 +31,7 @@
                     ],
                     __('ext.sec.student_affairs') => [
                         ['merchant.students', __('cabinet.nav.students'), 'users', CabinetRoles::STUDENTS_VIEW],
-                        ['merchant.departments', __('ext.menu.departments'), 'sitemap'],
+                        ['merchant.departments', __('cabinet.departments.title'), 'sitemap', CabinetRoles::STUDENTS_MANAGE],
                     ],
                     __('ext.sec.accounting') => [
                         ['merchant.schedules', __('cabinet.nav.schedules'), 'calendar', CabinetRoles::SCHEDULES],

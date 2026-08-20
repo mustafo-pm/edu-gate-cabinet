@@ -62,9 +62,12 @@ Route::middleware(['auth:merchant', 'password.change'])->group(function () {
     Route::get('accounts', Staff::class)->name('accounts')
         ->middleware('can:'.CabinetRoles::STAFF);
 
+    // Faculties and chairs — the grouping students and reporting hang off.
+    Route::get('departments', Departments::class)->name('departments')
+        ->middleware('can:'.CabinetRoles::STUDENTS_MANAGE);
+
     // Demo pages (UI only)
     Route::get('analytics', Analytics::class)->name('analytics');
-    Route::get('departments', Departments::class)->name('departments');
     Route::get('reports', Reports::class)->name('reports')
         ->middleware('can:'.CabinetRoles::REPORTS);
     Route::get('messaging', Messaging::class)->name('messaging');
